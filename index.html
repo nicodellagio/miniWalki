@@ -1,0 +1,3277 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description"
+        content="Simulation visuelle de la dynamique de marche d'une jambe d'enfant (4-6 ans) pour l'étude du contrôle d'exosquelette pédiatrique.">
+    <title>Simulation Dynamique de Marche — Exosquelette Pédiatrique</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@400;600;700&display=swap"
+        rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+    <style>
+        :root {
+            --bg-primary: #0a0e1a;
+            --bg-secondary: #111827;
+            --bg-card: #1a2035;
+            --bg-card-hover: #1f2847;
+            --accent-cyan: #00e5ff;
+            --accent-magenta: #e040fb;
+            --accent-green: #00e676;
+            --accent-orange: #ff9100;
+            --accent-red: #ff1744;
+            --text-primary: #e8eaf6;
+            --text-secondary: #9ea7c0;
+            --text-muted: #5c6380;
+            --border: #2a3150;
+            --glow-cyan: 0 0 20px rgba(0, 229, 255, 0.3);
+            --glow-magenta: 0 0 20px rgba(224, 64, 251, 0.3);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* ── Header ── */
+        header {
+            background: linear-gradient(135deg, rgba(0, 229, 255, 0.08), rgba(224, 64, 251, 0.08));
+            border-bottom: 1px solid var(--border);
+            padding: 16px 32px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            backdrop-filter: blur(12px);
+        }
+
+        header .logo {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-magenta));
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            font-weight: 700;
+            box-shadow: var(--glow-cyan);
+        }
+
+        header h1 {
+            font-size: 18px;
+            font-weight: 600;
+            background: linear-gradient(90deg, var(--accent-cyan), var(--accent-magenta));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        header .subtitle {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        /* ── Main Layout ── */
+        .app {
+            display: grid;
+            grid-template-columns: 1fr 420px;
+            grid-template-rows: auto auto;
+            gap: 16px;
+            padding: 16px;
+            min-height: calc(100vh - 120px);
+        }
+
+        /* ── Cards ── */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            overflow: hidden;
+            transition: border-color 0.3s;
+        }
+
+        .card:hover {
+            border-color: rgba(0, 229, 255, 0.3);
+        }
+
+        .card-header {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-secondary);
+        }
+
+        .card-header .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        /* ── Canvas Area ── */
+        .canvas-area {
+            display: flex;
+            flex-direction: column;
+            min-height: 300px;
+        }
+
+        .canvas-area .card-body {
+            flex: 1;
+            position: relative;
+        }
+
+        #simCanvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        /* ── Control Panel ── */
+        .control-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .control-panel::-webkit-scrollbar {
+            width: 5px;
+        }
+
+        .control-panel::-webkit-scrollbar-track {
+            background: rgba(42, 49, 80, 0.2);
+            border-radius: 4px;
+        }
+
+        .control-panel::-webkit-scrollbar-thumb {
+            background: var(--accent-cyan);
+            border-radius: 4px;
+            opacity: 0.5;
+        }
+
+        .card-body {
+            padding: 16px 18px;
+        }
+
+        /* ── Playback ── */
+        .playback-controls {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-family: 'Inter', sans-serif;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn:hover {
+            background: var(--bg-card-hover);
+            border-color: var(--accent-cyan);
+            box-shadow: var(--glow-cyan);
+        }
+
+        .btn.active {
+            background: linear-gradient(135deg, rgba(0, 229, 255, 0.15), rgba(0, 229, 255, 0.05));
+            border-color: var(--accent-cyan);
+            color: var(--accent-cyan);
+        }
+
+        .btn-icon {
+            padding: 10px 14px;
+            font-size: 18px;
+        }
+
+        .cycle-display {
+            margin-left: auto;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--accent-cyan);
+        }
+
+        /* ── Sliders ── */
+        .slider-group {
+            margin-bottom: 12px;
+        }
+
+        .slider-group:last-child {
+            margin-bottom: 0;
+        }
+
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .slider-value {
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--accent-cyan);
+            font-weight: 500;
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 4px;
+            background: var(--border);
+            border-radius: 2px;
+            outline: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            background: var(--accent-cyan);
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 0 8px rgba(0, 229, 255, 0.5);
+            transition: transform 0.15s;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        /* ── Toggle Switch ── */
+        .toggle-group {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-top: 1px solid rgba(42, 49, 80, 0.4);
+            margin-top: 4px;
+        }
+
+        .toggle-group .toggle-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 44px;
+            height: 24px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: var(--border);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .toggle-slider::before {
+            content: '';
+            position: absolute;
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background: var(--text-primary);
+            border-radius: 50%;
+            transition: transform 0.3s;
+        }
+
+        .toggle-switch input:checked+.toggle-slider {
+            background: var(--accent-green);
+            box-shadow: 0 0 10px rgba(0, 230, 118, 0.4);
+        }
+
+        .toggle-switch input:checked+.toggle-slider::before {
+            transform: translateX(20px);
+        }
+
+        /* ── Toggle Switches Removed ── */
+        .pd-card {
+            display: none;
+        }
+
+        .pd-card.visible {
+            display: block;
+        }
+
+        /* ── Angle Readouts ── */
+        .angle-readouts {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 10px;
+        }
+
+        .angle-item {
+            background: var(--bg-secondary);
+            border: 1px solid rgba(42, 49, 80, 0.5);
+            border-radius: 10px;
+            padding: 14px 10px;
+            text-align: center;
+            transition: border-color 0.3s, transform 0.2s;
+        }
+
+        .angle-item:hover {
+            border-color: rgba(0, 229, 255, 0.3);
+            transform: translateY(-1px);
+        }
+
+        .angle-item .label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+        }
+
+        .angle-item .value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 22px;
+            font-weight: 700;
+            line-height: 1.1;
+        }
+
+        .angle-item .unit {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-left: 1px;
+        }
+
+        /* ── Phase Bar ── */
+        .phase-bar {
+            height: 30px;
+            border-radius: 8px;
+            overflow: hidden;
+            background: var(--bg-secondary);
+            border: 1px solid rgba(42, 49, 80, 0.5);
+            position: relative;
+            margin-top: 10px;
+        }
+
+        .phase-fill {
+            height: 100%;
+            border-radius: 8px;
+            transition: width 0.05s linear;
+        }
+
+        .phase-label {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-primary);
+            text-shadow: 0 1px 4px rgba(0, 0, 0, 0.7);
+            white-space: nowrap;
+            letter-spacing: 0.3px;
+        }
+
+        /* ── Charts ── */
+        .charts-area {
+            grid-column: 1 / -1;
+        }
+
+        .charts-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 12px;
+            padding: 14px 16px;
+        }
+
+        .chart-box {
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            padding: 8px;
+            position: relative;
+        }
+
+        .chart-box .chart-title {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+            text-align: center;
+        }
+
+        .chart-box canvas {
+            width: 100%;
+            height: 120px;
+            display: block;
+        }
+
+        /* ── Legend ── */
+        .chart-legend {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            padding: 6px 0 0 0;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 10px;
+            color: var(--text-secondary);
+        }
+
+        .legend-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        /* ── Torque indicators ── */
+        .torque-readouts {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 10px;
+        }
+
+        .torque-item {
+            background: var(--bg-secondary);
+            border: 1px solid rgba(42, 49, 80, 0.5);
+            border-radius: 10px;
+            padding: 14px 10px;
+            text-align: center;
+            transition: border-color 0.3s, transform 0.2s;
+        }
+
+        .torque-item:hover {
+            border-color: rgba(224, 64, 251, 0.3);
+            transform: translateY(-1px);
+        }
+
+        .torque-item .label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+        }
+
+        .torque-item .value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 18px;
+            font-weight: 700;
+            line-height: 1.1;
+        }
+
+        .torque-item .unit {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        /* ── Responsive ── */
+        @media (max-width: 1100px) {
+            .app {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto auto auto;
+                height: auto;
+                min-height: auto;
+            }
+
+            .canvas-area {
+                grid-row: auto;
+                min-height: 280px;
+                max-height: 50vh;
+            }
+
+            .control-panel {
+                max-height: none;
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 12px;
+            }
+        }
+
+        @media (max-width: 600px) {
+            .control-panel {
+                grid-template-columns: 1fr;
+            }
+
+            .app {
+                grid-template-rows: 45vh auto auto;
+                padding: 8px;
+                gap: 8px;
+            }
+
+            .canvas-area {
+                min-height: 220px;
+                max-height: 45vh;
+            }
+
+            header {
+                padding: 10px 14px;
+            }
+
+            header h1 {
+                font-size: 16px;
+            }
+
+            .tab-nav {
+                padding: 0 8px;
+            }
+
+            .tab-nav button {
+                padding: 10px 12px;
+                font-size: 11px;
+            }
+
+            .charts-container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* ── Info Buttons ── */
+        .info-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-muted);
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+            margin-left: 6px;
+            transition: all 0.3s;
+            font-style: italic;
+            font-family: serif;
+            line-height: 1;
+            flex-shrink: 0;
+        }
+
+        .info-btn:hover {
+            background: var(--accent-cyan);
+            color: #000;
+            border-color: var(--accent-cyan);
+        }
+
+        /* ── Info Modal ── */
+        .info-modal-overlay {
+            display: none;
+            position: fixed;
+            z-index: 200;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            align-items: center;
+            justify-content: center;
+        }
+
+        .info-modal-overlay.visible {
+            display: flex;
+        }
+
+        .info-modal {
+            background: var(--bg-card);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 14px;
+            max-width: 540px;
+            width: 90%;
+            padding: 28px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
+            color: var(--text-secondary);
+            font-size: 14px;
+            line-height: 1.7;
+        }
+
+        .info-modal h3 {
+            margin: 0 0 12px 0;
+            color: #fff;
+            font-family: 'Outfit', 'Inter', sans-serif;
+            font-size: 1.3rem;
+        }
+
+        .info-modal p {
+            margin: 0 0 10px 0;
+        }
+
+        .info-modal .close-info {
+            float: right;
+            font-size: 24px;
+            cursor: pointer;
+            color: #aaa;
+            line-height: 1;
+        }
+
+        .info-modal .close-info:hover {
+            color: #fff;
+        }
+
+        /* ── Tab Navigation ── */
+        .tab-nav {
+            display: flex;
+            gap: 0;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            padding: 0 20px;
+        }
+
+        .tab-nav button {
+            padding: 12px 20px;
+            border: none;
+            background: none;
+            color: var(--text-muted);
+            font-family: 'Inter', sans-serif;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .tab-nav button.active {
+            color: var(--accent-cyan);
+            border-bottom-color: var(--accent-cyan);
+        }
+
+        .tab-nav button:hover:not(.active) {
+            color: var(--text-primary);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* ── Engineering Panel ── */
+        .eng-panel {
+            padding: 30px 5%;
+            max-width: 1000px;
+            margin: 0 auto;
+            color: var(--text-secondary);
+            font-size: 14px;
+            line-height: 1.8;
+        }
+
+        .eng-panel h2 {
+            color: #fff;
+            font-family: 'Outfit', 'Inter', sans-serif;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 8px;
+            margin-top: 40px;
+            font-size: 1.4rem;
+        }
+
+        .eng-panel h3 {
+            color: var(--accent-cyan);
+            font-size: 1.1rem;
+            margin-top: 25px;
+        }
+
+        .eng-panel code {
+            background: rgba(0, 229, 255, 0.08);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            color: var(--accent-cyan);
+        }
+
+        .eng-panel .eq-block {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px 20px;
+            margin: 12px 0;
+            overflow-x: auto;
+            text-align: center;
+            font-size: 16px;
+            color: #ddd;
+        }
+
+        .eng-panel table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 12px 0;
+        }
+
+        .eng-panel th,
+        .eng-panel td {
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            text-align: left;
+        }
+
+        .eng-panel th {
+            background: var(--bg-secondary);
+            color: var(--accent-cyan);
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+
+        /* ── Usage Footer ── */
+        .usage-footer {
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border);
+            padding: 30px 5%;
+            color: var(--text-muted);
+            font-size: 13px;
+            line-height: 1.8;
+        }
+
+        .usage-footer h3 {
+            color: var(--text-primary);
+            font-family: 'Outfit', 'Inter', sans-serif;
+            margin: 0 0 12px 0;
+            font-size: 1rem;
+        }
+
+        .usage-footer ol {
+            padding-left: 20px;
+            margin: 0;
+        }
+
+        .usage-footer li {
+            margin-bottom: 6px;
+        }
+
+        .usage-footer em {
+            color: var(--accent-cyan);
+            font-style: normal;
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <div class="logo">🦿</div>
+        <div>
+            <h1>Simulation Dynamique de Marche</h1>
+            <div class="subtitle">Modèle cinématique — Enfant 4-6 ans · Exosquelette pédiatrique</div>
+        </div>
+    </header>
+
+    <div class="tab-nav">
+        <button class="active" data-tab="tabSimulator">🦿 Simulateur</button>
+        <button data-tab="tabEngineering">📐 Ingénierie & Mathématiques</button>
+    </div>
+
+    <!-- Info Modal Overlay -->
+    <div class="info-modal-overlay" id="infoOverlay">
+        <div class="info-modal">
+            <span class="close-info" id="closeInfo">&times;</span>
+            <h3 id="infoTitle"></h3>
+            <div id="infoBody"></div>
+        </div>
+    </div>
+
+    <div id="tabSimulator" class="tab-content active">
+
+        <div class="app">
+            <!-- ── Canvas ── -->
+            <div class="card canvas-area">
+                <div class="card-header">
+                    <div class="dot" style="background:var(--accent-cyan)"></div>
+                    Simulation en temps réel
+                </div>
+                <div class="card-body">
+                    <canvas id="simCanvas"></canvas>
+                </div>
+            </div>
+
+            <!-- ── Right Panel ── -->
+            <div class="control-panel">
+                <!-- Playback -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="dot" style="background:var(--accent-green)"></div>
+                        Lecture
+                    </div>
+                    <div class="card-body">
+                        <div class="playback-controls">
+                            <button class="btn btn-icon" id="btnPlay" title="Play/Pause">▶</button>
+                            <button class="btn btn-icon" id="btnStep" title="Pas-à-pas">⏭</button>
+                            <button class="btn btn-icon" id="btnReset" title="Réinitialiser">⟲</button>
+                            <span class="cycle-display" id="cycleDisplay">0.0%</span>
+                        </div>
+                        <div class="phase-bar" style="margin-top:12px">
+                            <div class="phase-fill" id="phaseFill"
+                                style="width:0%;background:linear-gradient(90deg,var(--accent-green),var(--accent-cyan))">
+                            </div>
+                            <span class="phase-label" id="phaseLabel">Contact talon</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Patient Control (dynamic mode only) -->
+                <div class="card pd-card" id="pdCard">
+                    <div class="card-header">
+                        <div class="dot" style="background:var(--accent-orange)"></div>
+                        Patient (Muscles)
+                    </div>
+                    <div class="card-body">
+                        <div class="slider-group">
+                            <div class="slider-label">
+                                <span>Force Musculaire (Kp)</span>
+                                <span class="slider-value" id="valKp">200</span>
+                            </div>
+                            <input type="range" id="sliderKp" min="0" max="500" step="10" value="200">
+                        </div>
+                        <div class="slider-group">
+                            <div class="slider-label">
+                                <span>Frein Musculaire (Kd)</span>
+                                <span class="slider-value" id="valKd">30</span>
+                            </div>
+                            <input type="range" id="sliderKd" min="0" max="100" step="1" value="30">
+                        </div>
+                        <div class="slider-group">
+                            <div class="slider-label">
+                                <span>Raideur articulaire</span>
+                                <span class="slider-value" id="valDamp">0.5</span>
+                            </div>
+                            <input type="range" id="sliderDamp" min="0" max="3" step="0.1" value="0.5">
+                        </div>
+                        <div class="toggle-group" style="padding-top: 15px;">
+                            <span class="toggle-label">⚠️ Marche Fléchie (Crouch Gait) <span class="info-btn"
+                                    data-info="crouch">i</span></span>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="toggleCrouch">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="toggle-group">
+                            <span class="toggle-label">⚠️ Faiblesse (Parésie) <span class="info-btn"
+                                    data-info="paresie">i</span></span>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="toggleWeakness">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="slider-group" style="margin-top: 12px;">
+                            <div class="slider-label">
+                                <span>Spasticité Genou <span class="info-btn" data-info="spasticite">i</span></span>
+                                <span class="slider-value" id="valSpasticity">0</span>
+                            </div>
+                            <input type="range" id="sliderSpasticity" min="0" max="100" step="5" value="0">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Exoskeleton (dynamic mode only) -->
+                <div class="card pd-card" id="exoCard"
+                    style="display:none; border-left: 2px solid var(--accent-green);">
+                    <div class="card-header"
+                        style="justify-content: space-between; display: flex; align-items: center;">
+                        <div>
+                            <div class="dot" style="background:var(--accent-green)"></div>
+                            Exosquelette
+                        </div>
+                        <input type="checkbox" id="toggleExo" style="width:16px; height:16px; cursor:pointer;">
+                    </div>
+                    <div class="card-body" id="exoBody" style="opacity: 0.5; pointer-events: none;">
+                        <div class="toggle-group"
+                            style="margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                            <span class="toggle-label" style="color:var(--accent-orange)">Moteur AK60-6 (Limites
+                                Physiques)</span>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="toggleAk60">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="slider-group">
+                            <div class="slider-label">
+                                <span>Masse Exo par jambe</span>
+                                <span class="slider-value" id="valExoMass">1.5 kg</span>
+                            </div>
+                            <input type="range" id="sliderExoMass" min="0" max="10" step="0.5" value="1.5">
+                        </div>
+                        <div class="slider-group">
+                            <div class="slider-label">
+                                <span>Assistance Kp (Ressort)</span>
+                                <span class="slider-value" id="valExoKp">150</span>
+                            </div>
+                            <input type="range" id="sliderExoKp" min="0" max="500" step="10" value="150">
+                        </div>
+                        <div class="slider-group">
+                            <div class="slider-label">
+                                <span>Assistance Ki (Intégral)</span>
+                                <span class="slider-value" id="valExoKi">10</span>
+                            </div>
+                            <input type="range" id="sliderExoKi" min="0" max="100" step="1" value="10">
+                        </div>
+                        <div class="slider-group">
+                            <div class="slider-label">
+                                <span>Assistance Kd (Amorti)</span>
+                                <span class="slider-value" id="valExoKd">5</span>
+                            </div>
+                            <input type="range" id="sliderExoKd" min="0" max="50" step="1" value="5">
+                        </div>
+                        <div class="slider-group">
+                            <div class="slider-label">
+                                <span>Bande Morte (Tube °)</span>
+                                <span class="slider-value" id="valExoDeadband">2</span>
+                            </div>
+                            <input type="range" id="sliderExoDeadband" min="0" max="20" step="1" value="2">
+                        </div>
+                        <div style="margin-top: 15px;">
+                            <button id="btnStepResponse" class="btn"
+                                style="width:100%; background:var(--accent-magenta); color:#fff; display: flex; justify-content: center; align-items: center; gap: 8px;"><span>⚙️</span>
+                                Lancer Test Échelon</button>
+                        </div>
+                        <div id="stepMetrics"
+                            style="display:none; margin-top: 10px; background: rgba(0,0,0,0.2); padding: 8px; border-radius: 6px; border: 1px solid rgba(224, 64, 251, 0.3);">
+                            <div style="font-size:11px; color:#aaa; margin-bottom:4px; text-transform:uppercase;">
+                                Performances (Échelon 45°)</div>
+                            <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size:12px;">
+                                <div>$t_r$ : <span id="metricTr"
+                                        style="color:var(--accent-cyan); font-weight:bold;">--</span></div>
+                                <div>$D\%$ : <span id="metricOver"
+                                        style="color:var(--accent-magenta); font-weight:bold;">--</span></div>
+                                <div>$t_s$ : <span id="metricTs"
+                                        style="color:var(--accent-green); font-weight:bold;">--</span></div>
+                                <div>$\varepsilon$ : <span id="metricSs"
+                                        style="color:var(--accent-orange); font-weight:bold;">--</span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Speed -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="dot" style="background:var(--accent-orange)"></div>
+                        Paramètres
+                    </div>
+                    <div class="card-body">
+                        <div class="slider-group">
+                            <div class="slider-label">
+                                <span>Vitesse de marche</span>
+                                <span class="slider-value" id="valSpeed">0.5x</span>
+                            </div>
+                            <input type="range" id="sliderSpeed" min="0.2" max="3" step="0.1" value="0.5">
+                        </div>
+                        <div class="slider-group">
+                            <div class="slider-label">
+                                <span>Longueur cuisse</span>
+                                <span class="slider-value" id="valThigh">22 cm</span>
+                            </div>
+                            <input type="range" id="sliderThigh" min="15" max="30" step="0.5" value="22">
+                        </div>
+                        <div class="slider-group">
+                            <div class="slider-label">
+                                <span>Longueur tibia</span>
+                                <span class="slider-value" id="valShank">22 cm</span>
+                            </div>
+                            <input type="range" id="sliderShank" min="15" max="30" step="0.5" value="22">
+                        </div>
+                        <div class="slider-group">
+                            <div class="slider-label">
+                                <span>Longueur pied</span>
+                                <span class="slider-value" id="valFoot">15 cm</span>
+                            </div>
+                            <input type="range" id="sliderFoot" min="10" max="22" step="0.5" value="15">
+                        </div>
+                        <div class="slider-group">
+                            <div class="slider-label">
+                                <span>Masse corporelle</span>
+                                <span class="slider-value" id="valMass">18 kg</span>
+                            </div>
+                            <input type="range" id="sliderMass" min="12" max="28" step="0.5" value="18">
+                        </div>
+                        <div class="toggle-group">
+                            <span class="toggle-label">🔒 Bloquer cheville à 90°</span>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="toggleAnkleLock" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Angles -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="dot" style="background:var(--accent-magenta)"></div>
+                        Angles articulaires
+                    </div>
+                    <div class="card-body">
+                        <div class="angle-readouts">
+                            <div class="angle-item">
+                                <div class="label">Hanche</div>
+                                <div class="value" style="color:var(--accent-cyan)" id="angHip">0<span
+                                        class="unit">°</span>
+                                </div>
+                            </div>
+                            <div class="angle-item">
+                                <div class="label">Genou</div>
+                                <div class="value" style="color:var(--accent-magenta)" id="angKnee">0<span
+                                        class="unit">°</span></div>
+                            </div>
+                            <div class="angle-item">
+                                <div class="label">Cheville</div>
+                                <div class="value" style="color:var(--accent-green)" id="angAnkle">0<span
+                                        class="unit">°</span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Torques -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="dot" style="background:var(--accent-red)"></div>
+                        Couples articulaires
+                    </div>
+                    <div class="card-body">
+                        <div class="torque-readouts">
+                            <div class="torque-item">
+                                <div class="label">Hanche</div>
+                                <div class="value" style="color:var(--accent-cyan)" id="torqHip">0<span class="unit">
+                                        N·m</span></div>
+                            </div>
+                            <div class="torque-item">
+                                <div class="label">Genou</div>
+                                <div class="value" style="color:var(--accent-magenta)" id="torqKnee">0<span
+                                        class="unit">
+                                        N·m</span></div>
+                            </div>
+                            <div class="torque-item">
+                                <div class="label">Cheville</div>
+                                <div class="value" style="color:var(--accent-green)" id="torqAnkle">0<span class="unit">
+                                        N·m</span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- GRF -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="dot" style="background:var(--accent-orange)"></div>
+                        Forces de réaction au sol
+                    </div>
+                    <div class="card-body">
+                        <div class="torque-readouts">
+                            <div class="torque-item">
+                                <div class="label">Verticale</div>
+                                <div class="value" style="color:#ffd740" id="grfVert">0<span class="unit"> N</span>
+                                </div>
+                            </div>
+                            <div class="torque-item">
+                                <div class="label">Horiz. (A-P)</div>
+                                <div class="value" style="color:#ff8a65" id="grfAP">0<span class="unit"> N</span></div>
+                            </div>
+                            <div class="torque-item">
+                                <div class="label">Phase</div>
+                                <div class="value" style="color:#b0bec5" id="grfPhase">—</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── Charts ── -->
+            <div class="card charts-area">
+                <div class="card-header">
+                    <div class="dot" style="background:var(--accent-orange)"></div>
+                    Graphiques en temps réel
+                </div>
+                <div class="charts-container">
+                    <div class="chart-box">
+                        <div class="chart-title">Angles articulaires (°)</div>
+                        <canvas id="chartAngles" height="120"></canvas>
+                        <div class="chart-legend">
+                            <div class="legend-item">
+                                <div class="legend-dot" style="background:var(--accent-cyan)"></div>Hanche
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-dot" style="background:var(--accent-magenta)"></div>Genou
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-dot" style="background:var(--accent-green)"></div>Cheville
+                            </div>
+                        </div>
+                    </div>
+                    <div class="chart-box">
+                        <div class="chart-title">Couples articulaires (N·m)</div>
+                        <canvas id="chartTorques" height="120"></canvas>
+                        <div class="chart-legend">
+                            <div class="legend-item">
+                                <div class="legend-dot" style="background:var(--accent-cyan)"></div>Hanche
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-dot" style="background:var(--accent-magenta)"></div>Genou
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-dot" style="background:var(--accent-green)"></div>Cheville
+                            </div>
+                        </div>
+                    </div>
+                    <div class="chart-box">
+                        <div class="chart-title">Cyclogramme</div>
+                        <canvas id="chartCyclogram" height="120"></canvas>
+                        <div class="chart-legend" style="padding-top:2px;">
+                            <div class="legend-item">
+                                <div class="legend-dot" style="background:#00e5ff"></div>Hanche (X)
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-dot" style="background:#e040fb"></div>Genou (Y)
+                            </div>
+                        </div>
+                    </div>
+                    <div class="chart-box">
+                        <div class="chart-title">Analyse PID (Hanche)</div>
+                        <canvas id="chartTrackingHip" height="120"></canvas>
+                        <div class="chart-legend" style="padding-top:2px; flex-wrap: wrap;">
+                            <div class="legend-item">
+                                <div class="legend-dot" style="background:#5c6380"></div>Cons(°)
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-dot" style="background:#e040fb"></div>Mes(°)
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-dot" style="background:#ff1744"></div>Err(°)
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-dot" style="background:var(--accent-orange)"></div>Vit(rad/s)
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-dot" style="background:#00e5ff"></div>Cmd(N·m)
+                            </div>
+                        </div>
+                    </div>
+                    <div class="chart-box">
+                        <div class="chart-title">Analyse PID (Genou)</div>
+                        <canvas id="chartTrackingKnee" height="120"></canvas>
+                        <div class="chart-legend" style="padding-top:2px; flex-wrap: wrap;">
+                            <div class="legend-item">
+                                <div class="legend-dot" style="background:#5c6380"></div>Cons(°)
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-dot" style="background:#e040fb"></div>Mes(°)
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-dot" style="background:#ff1744"></div>Err(°)
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-dot" style="background:var(--accent-orange)"></div>Vit(rad/s)
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-dot" style="background:#00e5ff"></div>Cmd(N·m)
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Graph Modal -->
+        <div id="graphModal" class="modal"
+            style="display:none; position:fixed; z-index:100; left:0; top:0; width:100%; height:100%; overflow:auto; background-color:rgba(0,0,0,0.8); align-items:center; justify-content:center; flex-direction:column; padding: 2vh 2vw; box-sizing: border-box;">
+            <div class="modal-content"
+                style="background-color: var(--panel-bg); padding: 20px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); width: 100%; max-width: 1600px; height: 100%; display: flex; flex-direction: column; box-shadow: 0 10px 40px rgba(0,0,0,0.9); box-sizing: border-box;">
+                <div
+                    style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px; flex-shrink: 0;">
+                    <h3 id="modalTitle" style="margin:0; font-family:'Outfit'; color:#fff; font-size:1.5rem;">Analyse
+                        Détaillée</h3>
+                    <span id="closeModal"
+                        style="color:#aaa; font-size:32px; font-weight:bold; cursor:pointer; line-height: 1;">&times;</span>
+                </div>
+                <div
+                    style="flex: 1; min-height: 0; width:100%; background:rgba(0,0,0,0.5); border-radius: 8px; overflow:hidden; border: 1px solid rgba(255,255,255,0.05); position: relative;">
+                    <canvas id="modalCanvas"
+                        style="position:absolute; left:0; top:0; width:100%; height:100%; display:block;"></canvas>
+                </div>
+                <div style="margin-top: 20px; display:flex; gap: 12px; justify-content: flex-end;">
+                    <button class="btn" id="btnExportCSV" style="background:var(--accent-cyan); color:#111;">Exporter
+                        CSV</button>
+                    <button class="btn" id="btnCapturePNG" style="background:var(--accent-green); color:#111;">Capture
+                        PNG</button>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            // ════════════════════════════════════════════════════════════════
+            // SIMULATION DYNAMIQUE DE MARCHE — ENFANT 4-6 ANS
+            // ════════════════════════════════════════════════════════════════
+
+            (function () {
+                'use strict';
+
+                // ── DOM References ──
+                const canvas = document.getElementById('simCanvas');
+                const ctx = canvas.getContext('2d');
+                const chartAnglesCanvas = document.getElementById('chartAngles');
+                const ctxA = chartAnglesCanvas.getContext('2d');
+                const chartTorquesCanvas = document.getElementById('chartTorques');
+                const ctxT = chartTorquesCanvas.getContext('2d');
+                const chartCyclogramCanvas = document.getElementById('chartCyclogram');
+                const ctxC = chartCyclogramCanvas.getContext('2d');
+                const chartTrackingHipCanvas = document.getElementById('chartTrackingHip');
+                const ctxTrH = chartTrackingHipCanvas.getContext('2d');
+                const chartTrackingKneeCanvas = document.getElementById('chartTrackingKnee');
+                const ctxTrK = chartTrackingKneeCanvas.getContext('2d');
+                const btnPlay = document.getElementById('btnPlay');
+                const btnStep = document.getElementById('btnStep');
+                const btnReset = document.getElementById('btnReset');
+
+                // ── State ──
+                let playing = false;
+                let cyclePhase = 0; // 0..1 over one full gait cycle
+                let lastTime = 0;
+                let stepTestActive = false;
+                let stepTestStartTime = 0;
+
+                // ── Parameters (in cm → convert to meters internally) ──
+                const params = {
+                    speed: 0.5,
+                    thighLen: 0.22,
+                    shankLen: 0.22,
+                    footLen: 0.15,
+                    mass: 18,
+                    ankleLocked: true,
+                    isCrouchGait: false,
+                    weaknessEnabled: false,
+                    spasticityLevel: 0
+                };
+
+                const g = 9.81;
+
+                // ── Gait Data History ──
+                const HISTORY_LEN = 200;
+                const history = {
+                    hip: [], knee: [], ankle: [],
+                    tHip: [], tKnee: [], tAnkle: [],
+                    pidRefHip: [], pidMeasHip: [], pidErrHip: [], pidCmdHip: [], pidVelHip: [],
+                    pidRefKnee: [], pidMeasKnee: [], pidErrKnee: [], pidCmdKnee: [], pidVelKnee: []
+                };
+
+                // Foot trajectory trail
+                const footTrail = [];
+                const TRAIL_LEN = 120;
+
+                // ────────────────────────────────────────────
+                // GAIT ANGLE DATA (pediatric gait, 4-6 years)
+                // Lookup tables at 5% increments (0%, 5%, ..., 100%)
+                // Smoothly interpolated with Catmull-Rom splines
+                // ────────────────────────────────────────────
+
+                // Hip flexion(+) / extension(-) in degrees
+                // Initial contact at 0%: hip flexed ~28°, extends through stance, flexes again in swing
+                const GAIT_HIP = [
+                    28, 25, 20, 14, 8, 2, -4, -8, -11, -12,
+                    -10, -4, 5, 15, 23, 28, 32, 33, 32, 30, 28
+                ];
+
+                // Knee flexion(+) in degrees
+                // Loading response peak ~18°, midstance near extension, swing peak ~62°
+                const GAIT_KNEE = [
+                    5, 12, 18, 20, 15, 8, 3, 2, 5, 12,
+                    22, 35, 50, 60, 63, 55, 38, 22, 12, 7, 5
+                ];
+
+                // Ankle dorsiflexion(+) / plantarflexion(-) in degrees
+                // Initial plantarflexion, midstance dorsiflexion, push-off plantarflexion, swing neutral
+                const GAIT_ANKLE = [
+                    0, -4, -5, -2, 3, 6, 9, 10, 8, 3,
+                    -5, -14, -18, -8, 0, 3, 3, 2, 0, 0, 0
+                ];
+
+                // ────────────────────────────────────────────
+                // CROUCH GAIT ANGLE DATA (GMFCS Level II/III)
+                // ────────────────────────────────────────────
+                const CGAIT_HIP = [
+                    40, 38, 35, 30, 25, 20, 15, 12, 10, 8,
+                    10, 15, 22, 30, 38, 42, 45, 45, 43, 42, 40
+                ];
+                const CGAIT_KNEE = [
+                    25, 30, 35, 36, 32, 28, 25, 24, 25, 30,
+                    38, 45, 55, 62, 65, 60, 48, 35, 28, 26, 25
+                ];
+                const CGAIT_ANKLE = [
+                    10, 8, 5, 8, 12, 15, 18, 20, 15, 10,
+                    5, -5, -8, -2, 5, 8, 10, 10, 10, 10, 10
+                ];
+
+                // ────────────────────────────────────────────
+                // GROUND REACTION FORCE DATA (pediatric gait, 4-6 years)
+                // Expressed as % of body weight
+                // Stance phase = 0-60% of gait cycle, swing = 60-100%
+                // ────────────────────────────────────────────
+
+                // Vertical GRF (% BW): characteristic M-shape double bump
+                const GRF_VERTICAL = [
+                    5, 60, 100, 115, 112, 100, 85, 80, 85, 100,
+                    112, 110, 80, 0, 0, 0, 0, 0, 0, 0, 5
+                ];
+
+                // Anterior-posterior GRF (% BW): braking (-) then propulsion (+)
+                const GRF_AP = [
+                    0, -5, -12, -15, -14, -10, -4, 0, 5, 10,
+                    14, 12, 5, 0, 0, 0, 0, 0, 0, 0, 0
+                ];
+
+                function grfVertical(t) {
+                    return catmullRom(GRF_VERTICAL, t);
+                }
+                function grfAP(t) {
+                    return catmullRom(GRF_AP, t);
+                }
+
+                // Catmull-Rom spline interpolation (cyclic)
+                function catmullRom(data, t) {
+                    t = ((t % 1) + 1) % 1; // ensure t ∈ [0, 1)
+                    const n = data.length - 1; // 20 intervals (data[0] == data[20])
+                    const pos = t * n;
+                    const i = Math.floor(pos);
+                    const f = pos - i;
+
+                    // Cyclic index helper
+                    const idx = (j) => {
+                        j = ((j % n) + n) % n;
+                        return data[j];
+                    };
+
+                    const p0 = idx(i - 1);
+                    const p1 = idx(i);
+                    const p2 = idx(i + 1);
+                    const p3 = idx(i + 2);
+
+                    const f2 = f * f;
+                    const f3 = f2 * f;
+
+                    return 0.5 * (
+                        (2 * p1) +
+                        (-p0 + p2) * f +
+                        (2 * p0 - 5 * p1 + 4 * p2 - p3) * f2 +
+                        (-p0 + 3 * p1 - 3 * p2 + p3) * f3
+                    );
+                }
+
+                function hipAngle(t, forceHealthy = false) { return catmullRom((params.isCrouchGait && !forceHealthy) ? CGAIT_HIP : GAIT_HIP, t); }
+                function kneeAngle(t, forceHealthy = false) { return catmullRom((params.isCrouchGait && !forceHealthy) ? CGAIT_KNEE : GAIT_KNEE, t); }
+                function ankleAngle(t, forceHealthy = false) {
+                    if (params.ankleLocked) return 0;
+                    return catmullRom((params.isCrouchGait && !forceHealthy) ? CGAIT_ANKLE : GAIT_ANKLE, t);
+                }
+
+                // ────────────────────────────────────────────
+                // EXOSKELETON PARAMS
+                let exoActive = false;
+                let useAk60Motor = false;
+                const AK60_MAX_TORQUE = 9.0;
+                const AK60_NO_LOAD_SPEED = 33.5;
+                const AK60_INERTIA = 0.05;
+                const AK60_FRICTION = 0.5;
+
+                let exoParams = { mass: 1.5, kp: 150, ki: 10, kd: 5, deadband: 2 };
+                let exoIntegralError = [0, 0, 0];
+
+                // ────────────────────────────────────────────
+                // DYNAMICS ENGINE
+                // Triple pendulum forward dynamics with PD control
+                // ────────────────────────────────────────────
+
+                let simMode = 'dynamic';
+
+                // Bipedal state: two legs, each a triple pendulum
+                const legs = [
+                    { q: [0, 0, Math.PI / 2], w: [0, 0, 0], grf: { fx: 0, fy: 0 }, tau: [0, 0, 0] },
+                    { q: [0, 0, Math.PI / 2], w: [0, 0, 0], grf: { fx: 0, fy: 0 }, tau: [0, 0, 0] }
+                ];
+                const LEG_PHASE_OFFSET = [0, 0.5]; // left at cyclePhase, right at +50%
+
+                // Backward compat alias
+                const dynState = legs[0];
+
+                const pdGains = { kp: 200, kd: 30, damping: 0.5 };
+                let lastJointTorques = [0, 0, 0];
+
+                // Ground contact parameters
+                const GROUND_K = 10000;  // N/m spring stiffness
+                const GROUND_B = 300;    // N·s/m damping
+                const GROUND_MU = 0.6;   // friction coefficient
+
+                // Convert joint angles (degrees) to absolute angles (radians)
+                function jointToAbsolute(hipDeg, kneeDeg, ankleDeg) {
+                    const h = hipDeg * Math.PI / 180;
+                    const k = kneeDeg * Math.PI / 180;
+                    const a = ankleDeg * Math.PI / 180;
+                    return [h, h - k, h - k + Math.PI / 2 - a];
+                }
+
+                function absoluteToJoint(q) {
+                    return {
+                        hip: q[0] * 180 / Math.PI,
+                        knee: (q[0] - q[1]) * 180 / Math.PI,
+                        ankle: (q[1] + Math.PI / 2 - q[2]) * 180 / Math.PI
+                    };
+                }
+
+                function initDynState() {
+                    for (let i = 0; i < 2; i++) {
+                        const phase = (cyclePhase + LEG_PHASE_OFFSET[i]) % 1;
+                        const h = hipAngle(phase), k = kneeAngle(phase), a = ankleAngle(phase);
+                        legs[i].q = jointToAbsolute(h, k, a);
+                        legs[i].w = [0, 0, 0];
+                        legs[i].tau = [0, 0, 0];
+                    }
+                }
+
+                // 3x3 linear system solver (Cramer's rule)
+                function solve3x3(M, b) {
+                    const det = M[0][0] * (M[1][1] * M[2][2] - M[1][2] * M[2][1])
+                        - M[0][1] * (M[1][0] * M[2][2] - M[1][2] * M[2][0])
+                        + M[0][2] * (M[1][0] * M[2][1] - M[1][1] * M[2][0]);
+                    if (Math.abs(det) < 1e-15) return [0, 0, 0];
+                    const invDet = 1 / det;
+                    const x = [];
+                    for (let col = 0; col < 3; col++) {
+                        const A = M.map(row => [...row]);
+                        A[0][col] = b[0]; A[1][col] = b[1]; A[2][col] = b[2];
+                        x[col] = (A[0][0] * (A[1][1] * A[2][2] - A[1][2] * A[2][1])
+                            - A[0][1] * (A[1][0] * A[2][2] - A[1][2] * A[2][0])
+                            + A[0][2] * (A[1][0] * A[2][1] - A[1][1] * A[2][0])) * invDet;
+                    }
+                    return x;
+                }
+
+                function getDynamicsMatrices(q, w) {
+                    const L1 = params.thighLen, L2 = params.shankLen, L3 = params.footLen;
+                    const exoMassPerSegment = exoActive ? exoParams.mass / 3 : 0;
+                    const m1 = params.mass * 0.10 + exoMassPerSegment;
+                    const m2 = params.mass * 0.05 + exoMassPerSegment;
+                    const m3 = params.mass * 0.015 + exoMassPerSegment;
+                    const lc1 = L1 / 2, lc2 = L2 / 2, lc3 = L3 / 2;
+                    const I1 = m1 * L1 * L1 / 12, I2 = m2 * L2 * L2 / 12, I3 = m3 * L3 * L3 / 12;
+                    const s12 = Math.sin(q[0] - q[1]), c12 = Math.cos(q[0] - q[1]);
+                    const s13 = Math.sin(q[0] - q[2]), c13 = Math.cos(q[0] - q[2]);
+                    const s23 = Math.sin(q[1] - q[2]), c23 = Math.cos(q[1] - q[2]);
+                    const a12 = (m2 * lc2 + m3 * L2) * L1;
+                    const a13 = m3 * lc3 * L1;
+                    const a23 = m3 * lc3 * L2;
+                    const addedInertia = (exoActive && useAk60Motor) ? AK60_INERTIA : 0;
+                    return {
+                        M: [
+                            [m1 * lc1 * lc1 + I1 + (m2 + m3) * L1 * L1 + addedInertia, a12 * c12, a13 * c13],
+                            [a12 * c12, m2 * lc2 * lc2 + I2 + m3 * L2 * L2 + addedInertia, a23 * c23],
+                            [a13 * c13, a23 * c23, m3 * lc3 * lc3 + I3 + addedInertia]
+                        ],
+                        C: [
+                            a12 * s12 * w[1] * w[1] + a13 * s13 * w[2] * w[2],
+                            -a12 * s12 * w[0] * w[0] + a23 * s23 * w[2] * w[2],
+                            -a13 * s13 * w[0] * w[0] - a23 * s23 * w[1] * w[1]
+                        ],
+                        G: [
+                            (m1 * lc1 + (m2 + m3) * L1) * g * Math.sin(q[0]),
+                            (m2 * lc2 + m3 * L2) * g * Math.sin(q[1]),
+                            m3 * lc3 * g * Math.sin(q[2])
+                        ]
+                    };
+                }
+
+                // Forward dynamics
+                function forwardDyn(q, w, jointTau) {
+                    const { M, C, G } = getDynamicsMatrices(q, w);
+                    const Q = [
+                        jointTau[0] + jointTau[1],
+                        -jointTau[1] + jointTau[2],
+                        -jointTau[2]
+                    ];
+                    let b = pdGains.damping;
+                    if (exoActive && useAk60Motor) b += AK60_FRICTION;
+                    const rhs = [
+                        Q[0] - C[0] - G[0] - b * w[0],
+                        Q[1] - C[1] - G[1] - b * w[1],
+                        Q[2] - C[2] - G[2] - b * w[2]
+                    ];
+                    return solve3x3(M, rhs);
+                }
+
+                // Weak patient controller (pure PD, no gravity compensation)
+                function purePDController(t, state, kp, kd, tauGRF) {
+                    const toRad = Math.PI / 180;
+                    const hC = hipAngle(t, false) * toRad, kC = kneeAngle(t, false) * toRad, aC = ankleAngle(t, false) * toRad;
+                    const curH = state.q[0];
+                    const curK = state.q[0] - state.q[1];
+                    const curA = state.q[1] + Math.PI / 2 - state.q[2];
+                    const wH = state.w[0], wK = state.w[0] - state.w[1], wA = state.w[1] - state.w[2];
+
+                    const grf0 = tauGRF ? tauGRF[0] : 0;
+                    const grf1 = tauGRF ? tauGRF[1] : 0;
+                    const grf2 = tauGRF ? tauGRF[2] : 0;
+
+                    // Parésie (Faiblesse) : Diminution drastique des gains volontaires
+                    let effKp = params.weaknessEnabled ? kp * 0.3 : kp;
+                    let effKd = params.weaknessEnabled ? kd * 0.3 : kd;
+
+                    const tauPat = [
+                        effKp * (hC - curH) - effKd * wH - grf0,
+                        effKp * (kC - curK) - effKd * wK - grf1,
+                        effKp * (aC - curA) - effKd * wA - grf2
+                    ];
+
+                    // Spasticité du genou (Ischio-jambiers) : Résistance à l'extension
+                    if (params.spasticityLevel > 0 && wK < 0) {
+                        const stretchVelocity = -wK;
+                        const threshold = 1.0; // rad/s
+                        if (stretchVelocity > threshold) {
+                            const tauSpastic = (params.spasticityLevel / 10) * (stretchVelocity - threshold);
+                            tauPat[1] += tauSpastic; // Couple fléchisseur résistant
+                        }
+                    }
+
+                    return tauPat;
+                }
+
+                // Advanced controller (Computed Torque with Gravity/Coriolis compensation)
+                function computedTorqueController(t, state, kp, kd, tauGRF, forceHealthy = false) {
+                    const eps = 0.001;
+                    const cycleDur = 0.8 / params.speed;
+                    const phaseRate = 1 / cycleDur;
+                    const toRad = Math.PI / 180;
+
+                    const hC = hipAngle(t, forceHealthy) * toRad, kC = kneeAngle(t, forceHealthy) * toRad, aC = ankleAngle(t, forceHealthy) * toRad;
+                    const hP = hipAngle((t + eps) % 1, forceHealthy) * toRad, hM = hipAngle((t - eps + 1) % 1, forceHealthy) * toRad;
+                    const kP = kneeAngle((t + eps) % 1, forceHealthy) * toRad, kM = kneeAngle((t - eps + 1) % 1, forceHealthy) * toRad;
+                    const aP = ankleAngle((t + eps) % 1, forceHealthy) * toRad, aM = ankleAngle((t - eps + 1) % 1, forceHealthy) * toRad;
+
+                    const dh = (hP - hM) * phaseRate / (2 * eps);
+                    const dk = (kP - kM) * phaseRate / (2 * eps);
+                    const da = (aP - aM) * phaseRate / (2 * eps);
+                    const ddh = (hP - 2 * hC + hM) * phaseRate * phaseRate / (eps * eps);
+                    const ddk = (kP - 2 * kC + kM) * phaseRate * phaseRate / (eps * eps);
+                    const dda = (aP - 2 * aC + aM) * phaseRate * phaseRate / (eps * eps);
+
+                    const curH = state.q[0];
+                    const curK = state.q[0] - state.q[1];
+                    const curA = state.q[1] + Math.PI / 2 - state.q[2];
+                    const wH = state.w[0], wK = state.w[0] - state.w[1], wA = state.w[1] - state.w[2];
+
+                    const cmd_ddh = ddh + kp * (hC - curH) + kd * (dh - wH);
+                    const cmd_ddk = ddk + kp * (kC - curK) + kd * (dk - wK);
+                    const cmd_dda = dda + kp * (aC - curA) + kd * (da - wA);
+
+                    const qdd_cmd = [cmd_ddh, cmd_ddh - cmd_ddk, cmd_ddh - cmd_ddk - cmd_dda];
+                    const { M, C, G } = getDynamicsMatrices(state.q, state.w);
+                    const b = pdGains.damping;
+                    const Q_cmd = [
+                        M[0][0] * qdd_cmd[0] + M[0][1] * qdd_cmd[1] + M[0][2] * qdd_cmd[2] + C[0] + G[0] + b * state.w[0],
+                        M[1][0] * qdd_cmd[0] + M[1][1] * qdd_cmd[1] + M[1][2] * qdd_cmd[2] + C[1] + G[1] + b * state.w[1],
+                        M[2][0] * qdd_cmd[0] + M[2][1] * qdd_cmd[1] + M[2][2] * qdd_cmd[2] + C[2] + G[2] + b * state.w[2]
+                    ];
+
+                    const grf0 = tauGRF ? tauGRF[0] : 0;
+                    const grf1 = tauGRF ? tauGRF[1] : 0;
+                    const grf2 = tauGRF ? tauGRF[2] : 0;
+
+                    return [
+                        (Q_cmd[0] + Q_cmd[1] + Q_cmd[2]) - grf0,
+                        (-Q_cmd[1] - Q_cmd[2]) - grf1,
+                        (-Q_cmd[2]) - grf2
+                    ];
+                }
+
+                // ────────────────────────────────────────────
+                // EXOSKELETON AAN CONTROLLER (PHASE 3)
+                // ────────────────────────────────────────────
+
+                function getExoDynamicsMatrices(q, w) {
+                    const L1 = params.thighLen, L2 = params.shankLen;
+                    const m1 = exoParams.mass / 3, m2 = exoParams.mass / 3, m3 = exoParams.mass / 3;
+                    const lc1 = L1 / 2, lc2 = L2 / 2, lc3 = params.footLen / 2;
+                    const g = 9.81;
+
+                    const G = [
+                        -(m1 * lc1 + m2 * L1 + m3 * L1) * g * Math.sin(q[0]),
+                        -(m2 * lc2 + m3 * L2) * g * Math.sin(q[1]),
+                        -(m3 * lc3) * g * Math.sin(q[2])
+                    ];
+                    return { G };
+                }
+
+                let lastExoDebug = null;
+
+                function exoPIDController(t, state) {
+                    const dt = 0.005; // Approx integration step for solver sub-evaluations
+
+                    // 1. Transparency (Gravity comp for exo mass)
+                    const exoDyn = getExoDynamicsMatrices(state.q, state.w);
+                    const Q_ff = exoDyn.G;
+                    // Convert absolute segment torques Q to relative joint torques tau
+                    const tau_ff = [
+                        Q_ff[0] + Q_ff[1] + Q_ff[2],
+                        -Q_ff[1] - Q_ff[2],
+                        -Q_ff[2]
+                    ];
+
+                    // 2. PID Assist-As-Needed
+                    const toRad = Math.PI / 180;
+
+                    let hRef = hipAngle(t, true) * toRad;
+                    let kRef = kneeAngle(t, true) * toRad;
+                    let aRef = ankleAngle(t, true) * toRad;
+
+                    if (stepTestActive) {
+                        hRef = 45 * toRad;
+                        kRef = 45 * toRad;
+                        aRef = 0;
+                    }
+
+                    const curH = state.q[0];
+                    const curK = state.q[0] - state.q[1];
+                    const curA = state.q[1] + Math.PI / 2 - state.q[2];
+
+                    const e = [hRef - curH, kRef - curK, aRef - curA];
+
+                    const tolRad = exoParams.deadband * toRad;
+                    const e_eff = [0, 0, 0];
+                    for (let i = 0; i < 3; i++) {
+                        if (Math.abs(e[i]) <= tolRad) {
+                            e_eff[i] = 0;
+                        } else {
+                            e_eff[i] = e[i] - Math.sign(e[i]) * tolRad;
+                        }
+                    }
+
+                    // Integral Accumulator (with anti-windup)
+                    for (let i = 0; i < 3; i++) {
+                        if (e_eff[i] !== 0) {
+                            exoIntegralError[i] += e_eff[i] * dt;
+                            exoIntegralError[i] = Math.max(-10, Math.min(10, exoIntegralError[i]));
+                        } else {
+                            exoIntegralError[i] *= 0.95; // decay in deadband
+                        }
+                    }
+
+                    const wH = state.w[0];
+                    const wK = state.w[0] - state.w[1];
+                    const wA = state.w[1] - state.w[2];
+                    const de = [-wH, -wK, -wA];
+
+                    const tau_assist = [
+                        exoParams.kp * e_eff[0] + exoParams.ki * exoIntegralError[0] + exoParams.kd * de[0],
+                        exoParams.kp * e_eff[1] + exoParams.ki * exoIntegralError[1] + exoParams.kd * de[1],
+                        exoParams.kp * e_eff[2] + exoParams.ki * exoIntegralError[2] + exoParams.kd * de[2]
+                    ];
+
+                    if (useAk60Motor) {
+                        for (let i = 0; i < 3; i++) {
+                            // Back-EMF velocity limit curve (torque drops to 0 rad/s at no load speed)
+                            const speed = Math.abs(state.w[i]);
+                            const maxTorqueSpeed = AK60_MAX_TORQUE * Math.max(0, 1 - speed / AK60_NO_LOAD_SPEED);
+                            tau_assist[i] = Math.max(-maxTorqueSpeed, Math.min(maxTorqueSpeed, tau_assist[i]));
+                        }
+                    }
+
+                    return {
+                        tau: [tau_ff[0] + tau_assist[0], tau_ff[1] + tau_assist[1], tau_ff[2] + tau_assist[2]],
+                        debug: {
+                            hip: { ref: hRef / toRad, meas: curH / toRad, err: e_eff[0] / toRad, cmd: tau_assist[0], vel: wH },
+                            knee: { ref: kRef / toRad, meas: curK / toRad, err: e_eff[1] / toRad, cmd: tau_assist[1], vel: wK }
+                        }
+                    };
+                }
+
+                function computeTorquesForLeg(t, state, tauGRF) {
+                    const isPathological = params.weaknessEnabled || params.spasticityLevel > 0 || params.isCrouchGait;
+                    let tauPat;
+
+                    if (stepTestActive) {
+                        tauPat = [0, 0, 0]; // Exo is tested in isolation against gravity & body mass
+                    } else if (!isPathological) {
+                        // Patient sain (avec ou sans exo) compense parfaitement sa propre gravité avec CTC
+                        tauPat = computedTorqueController(t, state, pdGains.kp, pdGains.kd, tauGRF, true);
+                    } else {
+                        // Patient pathologique utilise son PD rudimentaire
+                        tauPat = purePDController(t, state, pdGains.kp, pdGains.kd, null);
+                    }
+
+                    let tauExo = [0, 0, 0];
+                    if (exoActive) {
+                        const exoOut = exoPIDController(t, state);
+                        tauExo = exoOut.tau;
+                        lastExoDebug = exoOut.debug;
+                    }
+
+                    const total = [tauPat[0] + tauExo[0], tauPat[1] + tauExo[1], tauPat[2] + tauExo[2]];
+                    return { patient: tauPat, exo: tauExo, total: total };
+                }
+
+                function clampJointsForLeg(leg) {
+                    const joints = absoluteToJoint(leg.q);
+                    let clamped = false;
+                    if (joints.hip < -30) { joints.hip = -30; clamped = true; }
+                    if (joints.hip > 50) { joints.hip = 50; clamped = true; }
+                    if (joints.knee < -5) { joints.knee = -5; clamped = true; }
+                    if (joints.knee > 90) { joints.knee = 90; clamped = true; }
+                    if (joints.ankle < -35) { joints.ankle = -35; clamped = true; }
+                    if (joints.ankle > 30) { joints.ankle = 30; clamped = true; }
+                    if (clamped) {
+                        leg.q = jointToAbsolute(joints.hip, joints.knee, joints.ankle);
+                        leg.w = leg.w.map(v => v * 0.3);
+                    }
+                }
+
+                function applyFootForce(Fx, Fy, X_loc, Y_loc, q) {
+                    const L1 = params.thighLen, L2 = params.shankLen;
+                    const t0 = Fx * (L1 * Math.cos(q[0])) - Fy * (L1 * Math.sin(q[0]));
+                    const t1 = Fx * (L2 * Math.cos(q[1])) - Fy * (L2 * Math.sin(q[1]));
+                    const dx_dq2 = X_loc * Math.cos(q[2]) + Y_loc * Math.sin(q[2]);
+                    const dy_dq2 = -X_loc * Math.sin(q[2]) + Y_loc * Math.cos(q[2]);
+                    const t2 = Fx * dx_dq2 + Fy * dy_dq2;
+                    return [t0, t1, t2];
+                }
+
+                function computeDynamicGRF(leg, currentLowestY) {
+                    const q = leg.q;
+                    const w = leg.w;
+                    const L1 = params.thighLen, L2 = params.shankLen, L3 = params.footLen;
+
+                    const K = 15000; // N/m spring stiffness per point
+                    const B = 500;   // Ns/m damping
+                    const mu = 0.5;  // friction
+                    const B_friction = 200; // viscous horizontal friction
+
+                    // We want the stance foot to support ~1 Body Weight (BW) constantly.
+                    const bw_penetration = (params.mass * 9.81 * 1.05) / K;
+                    const y_ground = currentLowestY - bw_penetration;
+
+                    const xa = L1 * Math.sin(q[0]) + L2 * Math.sin(q[1]);
+                    const ya = L1 * Math.cos(q[0]) + L2 * Math.cos(q[1]);
+                    const vax = L1 * w[0] * Math.cos(q[0]) + L2 * w[1] * Math.cos(q[1]);
+                    const vay = -L1 * w[0] * Math.sin(q[0]) - L2 * w[1] * Math.sin(q[1]);
+
+                    const treadmill_v = -0.5 * params.speed;
+
+                    const N = 5;
+                    const C_bulge = 0.03; // Semi-parabolic rocker sole depth
+
+                    let totalFx = 0, totalFy = 0;
+                    let sumNyX = 0, sumNyY = 0;
+                    let Q0 = 0, Q1 = 0, Q2 = 0;
+
+                    for (let i = 0; i < N; i++) {
+                        const u = i / (N - 1);
+                        const X_loc = u * L3;
+                        const Y_loc = C_bulge * 4 * u * (1 - u);
+
+                        const x_i = xa + X_loc * Math.sin(q[2]) - Y_loc * Math.cos(q[2]);
+                        const y_i = ya + X_loc * Math.cos(q[2]) + Y_loc * Math.sin(q[2]);
+
+                        const vx_i = vax + w[2] * (X_loc * Math.cos(q[2]) + Y_loc * Math.sin(q[2]));
+                        const vy_i = vay + w[2] * (-X_loc * Math.sin(q[2]) + Y_loc * Math.cos(q[2]));
+
+                        let Ny = 0, Fx = 0;
+                        if (y_i > y_ground) {
+                            // The force is distributed, so we can divide K by N or leave it strong
+                            // Since we just check penetration relative to the deepest point, it's fine.
+                            Ny = Math.max(0, (K / 2) * (y_i - y_ground) + B * vy_i);
+                            const v_rel_x = vx_i - treadmill_v;
+                            Fx = -Math.sign(v_rel_x) * Math.min(Math.abs(B_friction * v_rel_x), mu * Ny);
+
+                            totalFy += Ny;
+                            totalFx += Fx;
+                            sumNyX += Ny * x_i;
+                            sumNyY += Ny * y_i;
+
+                            const tauP = applyFootForce(Fx, -Ny, X_loc, Y_loc, q);
+                            Q0 += tauP[0];
+                            Q1 += tauP[1];
+                            Q2 += tauP[2];
+                        }
+                    }
+
+                    let copX = xa, copY = ya;
+                    if (totalFy > 0) {
+                        copX = sumNyX / totalFy;
+                        copY = sumNyY / totalFy;
+                    }
+
+                    leg.grf = { fx: totalFx, fy: totalFy, copX: copX, copY: copY };
+
+                    const T2 = -Q2;
+                    const T1 = -Q1 + T2;
+                    const T0 = Q0 - T1; // Equivalent to Q0 + Q1 + Q2
+
+                    return [T0, T1, T2];
+                }
+
+                // Calculate the absolute lowest Y point of both dynamic legs
+                function getDynamicLowestY(legsArray) {
+                    let maxY = -1000;
+                    const L1 = params.thighLen, L2 = params.shankLen, L3 = params.footLen;
+                    const N = 5;
+                    const C_bulge = 0.03;
+
+                    for (let i = 0; i < 2; i++) {
+                        const q = legsArray[i].q;
+                        const ya = L1 * Math.cos(q[0]) + L2 * Math.cos(q[1]);
+                        for (let j = 0; j < N; j++) {
+                            const u = j / (N - 1);
+                            const X_loc = u * L3;
+                            const Y_loc = C_bulge * 4 * u * (1 - u);
+                            const y_i = ya + X_loc * Math.cos(q[2]) + Y_loc * Math.sin(q[2]);
+                            maxY = Math.max(maxY, y_i);
+                        }
+                    }
+                    return Math.max(0, maxY);
+                }
+
+                // Bipedal physics step: simulate both legs
+                function physicsStep(dt) {
+                    const currentLowestY = getDynamicLowestY(legs);
+
+                    for (let i = 0; i < 2; i++) {
+                        const phase = (cyclePhase + LEG_PHASE_OFFSET[i]) % 1;
+
+                        // GRF must be computed first so it can be fed-forward to the controllers
+                        const tauGRF = computeDynamicGRF(legs[i], currentLowestY);
+                        const tauSets = computeTorquesForLeg(phase, legs[i], tauGRF);
+
+                        const totalCombined = [
+                            tauSets.total[0] + tauGRF[0],
+                            tauSets.total[1] + tauGRF[1],
+                            tauSets.total[2] + tauGRF[2]
+                        ];
+
+                        legs[i].tau = tauSets.total; // Store actuator torque for charts
+                        legs[i].tauPatient = tauSets.patient;
+                        legs[i].tauExo = tauSets.exo;
+
+                        const qdd = forwardDyn(legs[i].q, legs[i].w, totalCombined);
+                        for (let j = 0; j < 3; j++) {
+                            const acc = Math.max(-4000, Math.min(4000, qdd[j]));
+                            legs[i].w[j] += acc * dt;
+                            legs[i].w[j] = Math.max(-40, Math.min(40, legs[i].w[j]));
+                            legs[i].q[j] += legs[i].w[j] * dt;
+                        }
+                        clampJointsForLeg(legs[i]);
+                    }
+                    lastJointTorques = legs[0].tau;
+                }
+
+                // ────────────────────────────────────────────
+                // SIMPLIFIED INVERSE DYNAMICS
+                // Estimates joint torques using Newton-Euler approach
+                // ────────────────────────────────────────────
+
+                function computeTorques(t, dt) {
+                    const eps = 0.001;
+                    const t1 = (t - eps + 1) % 1;
+                    const t2 = (t + eps) % 1;
+
+                    const dHip = (hipAngle(t2) - hipAngle(t1)) / (2 * eps);
+                    const dKnee = (kneeAngle(t2) - kneeAngle(t1)) / (2 * eps);
+                    const dAnkle = (ankleAngle(t2) - ankleAngle(t1)) / (2 * eps);
+
+                    // Second derivatives (angular accelerations)
+                    const t0 = (t - 2 * eps + 1) % 1;
+                    const t3 = (t + 2 * eps) % 1;
+                    const ddHip = (hipAngle(t3) - 2 * hipAngle(t) + hipAngle(t0)) / (4 * eps * eps);
+                    const ddKnee = (kneeAngle(t3) - 2 * kneeAngle(t) + kneeAngle(t0)) / (4 * eps * eps);
+                    const ddAnkle = (ankleAngle(t3) - 2 * ankleAngle(t) + ankleAngle(t0)) / (4 * eps * eps);
+
+                    // Segment masses (fraction of body mass)
+                    const mThigh = params.mass * 0.10;
+                    const mShank = params.mass * 0.05;
+                    const mFoot = params.mass * 0.015;
+
+                    // Moments of inertia approximation (rod: 1/12 * m * L^2)
+                    const IThigh = (1 / 12) * mThigh * params.thighLen * params.thighLen;
+                    const IShank = (1 / 12) * mShank * params.shankLen * params.shankLen;
+                    const IFoot = (1 / 12) * mFoot * params.footLen * params.footLen;
+
+                    // Convert angular acceleration from deg/cycle² to rad/s²
+                    const cycleDuration = 0.8 / params.speed;
+                    const scale = (Math.PI / 180) / (cycleDuration * cycleDuration);
+
+                    // Simplified torque calculations (I * alpha + gravity contribution)
+                    // Gravity torques use the absolute segment angle from vertical
+                    const hipRad = hipAngle(t) * Math.PI / 180;
+                    const shankRad = (hipAngle(t) - kneeAngle(t)) * Math.PI / 180;
+
+                    const tHip = IThigh * ddHip * scale
+                        + mThigh * g * (params.thighLen / 2) * Math.sin(hipRad)
+                        + (mShank + mFoot) * g * params.thighLen * Math.sin(hipRad);
+
+                    const tKnee = IShank * ddKnee * scale
+                        + mShank * g * (params.shankLen / 2) * Math.sin(shankRad)
+                        + mFoot * g * params.shankLen * Math.sin(shankRad);
+
+                    const tAnkle = IFoot * ddAnkle * scale
+                        + mFoot * g * (params.footLen / 2) * Math.sin(ankleAngle(t) * Math.PI / 180);
+
+                    return { hip: tHip, knee: tKnee, ankle: tAnkle };
+                }
+
+                // ────────────────────────────────────────────
+                // FORWARD KINEMATICS
+                // Compute joint positions from angles
+                // Convention: y-axis points DOWN (canvas), x-axis points RIGHT (forward)
+                // Hip angle: flexion (+) swings thigh forward, extension (-) swings backward
+                // Knee angle: flexion (+) bends shank backward relative to thigh
+                // Ankle angle: dorsiflexion (+) lifts toes up, plantarflexion (-) points toes down
+                // ────────────────────────────────────────────
+
+                function forwardKinematics(hipAng, kneeAng, ankleAng) {
+                    // Convert to radians
+                    const hRad = hipAng * Math.PI / 180;
+                    const kRad = kneeAng * Math.PI / 180;
+                    const aRad = ankleAng * Math.PI / 180;
+
+                    // Scale factor: pixels per meter
+                    const scale = 500;
+
+                    const hipPos = { x: 0, y: 0 };
+
+                    // Knee position: thigh hangs from hip
+                    // At 0° hip, thigh is vertical (straight down). Flexion (+) swings forward (right).
+                    const kneePos = {
+                        x: hipPos.x + params.thighLen * scale * Math.sin(hRad),
+                        y: hipPos.y + params.thighLen * scale * Math.cos(hRad),
+                    };
+
+                    // Shank: knee flexion bends the shank BACKWARD relative to the thigh
+                    // Absolute shank angle = hip angle MINUS knee flexion
+                    const shankAbsAngle = hRad - kRad;
+                    const anklePos = {
+                        x: kneePos.x + params.shankLen * scale * Math.sin(shankAbsAngle),
+                        y: kneePos.y + params.shankLen * scale * Math.cos(shankAbsAngle),
+                    };
+
+                    // Foot: perpendicular to shank, pointing forward
+                    // Dorsiflexion (+) lifts toes up (reduces angle from horizontal)
+                    const footAbsAngle = shankAbsAngle + (Math.PI / 2) - aRad;
+                    const toePos = {
+                        x: anklePos.x + params.footLen * scale * Math.sin(footAbsAngle),
+                        y: anklePos.y + params.footLen * scale * Math.cos(footAbsAngle),
+                    };
+
+                    return { hipPos, kneePos, anklePos, toePos };
+                }
+
+                // ────────────────────────────────────────────
+                // RENDERING
+                // ────────────────────────────────────────────
+
+                function resizeCanvas() {
+                    const parent = canvas.parentElement;
+                    canvas.width = parent.clientWidth * devicePixelRatio;
+                    canvas.height = parent.clientHeight * devicePixelRatio;
+                    ctx.scale(devicePixelRatio, devicePixelRatio);
+                }
+
+                function resizeCharts() {
+                    [chartAnglesCanvas, chartTorquesCanvas, chartCyclogramCanvas, chartTrackingHipCanvas, chartTrackingKneeCanvas].forEach(c => {
+                        const parent = c.parentElement;
+                        c.width = parent.clientWidth * devicePixelRatio;
+                        c.height = 120 * devicePixelRatio;
+                        c.getContext('2d').scale(devicePixelRatio, devicePixelRatio);
+                    });
+                }
+
+                function drawGrid(w, h) {
+                    ctx.strokeStyle = 'rgba(42,49,80,0.5)';
+                    ctx.lineWidth = 0.5;
+                    const step = 40;
+                    for (let x = 0; x < w; x += step) {
+                        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+                    }
+                    for (let y = 0; y < h; y += step) {
+                        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+                    }
+                }
+
+                function drawSegment(x1, y1, x2, y2, color, thickness) {
+                    // Glow
+                    ctx.save();
+                    ctx.shadowColor = color;
+                    ctx.shadowBlur = 12;
+                    ctx.strokeStyle = color;
+                    ctx.lineWidth = thickness + 4;
+                    ctx.lineCap = 'round';
+                    ctx.globalAlpha = 0.3;
+                    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+                    ctx.restore();
+
+                    // Main segment
+                    ctx.strokeStyle = color;
+                    ctx.lineWidth = thickness;
+                    ctx.lineCap = 'round';
+                    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+                }
+
+                function drawParabolicFoot(ap, tp, color, lineWidth) {
+                    const bulgeDepth = 0.03 * 500; // 3cm scale
+                    ctx.save();
+                    ctx.shadowColor = color;
+                    ctx.shadowBlur = Math.round(lineWidth * 1.5);
+                    ctx.strokeStyle = color;
+                    ctx.lineWidth = lineWidth;
+                    ctx.lineCap = 'round';
+                    ctx.beginPath();
+                    ctx.moveTo(ap.x, ap.y);
+
+                    const midX = (ap.x + tp.x) / 2;
+                    const midY = (ap.y + tp.y) / 2;
+                    const dx = tp.x - ap.x;
+                    const dy = tp.y - ap.y;
+                    const len = Math.sqrt(dx * dx + dy * dy) || 1;
+                    const nx = -dy / len;
+                    const ny = dx / len;
+
+                    const cpX = midX + nx * (2 * bulgeDepth);
+                    const cpY = midY + ny * (2 * bulgeDepth);
+
+                    ctx.quadraticCurveTo(cpX, cpY, tp.x, tp.y);
+                    ctx.stroke();
+                    ctx.restore();
+                }
+
+                function drawArrow(x1, y1, x2, y2, color, thickness) {
+                    const dx = x2 - x1, dy = y2 - y1;
+                    const len = Math.sqrt(dx * dx + dy * dy);
+                    if (len < 2) return;
+                    const ux = dx / len, uy = dy / len;
+                    const headLen = Math.min(10, len * 0.3);
+
+                    // Glow
+                    ctx.save();
+                    ctx.shadowColor = color;
+                    ctx.shadowBlur = 10;
+                    ctx.strokeStyle = color;
+                    ctx.lineWidth = thickness + 2;
+                    ctx.globalAlpha = 0.3;
+                    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+                    ctx.restore();
+
+                    // Shaft
+                    ctx.strokeStyle = color;
+                    ctx.lineWidth = thickness;
+                    ctx.lineCap = 'round';
+                    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+
+                    // Arrowhead
+                    ctx.fillStyle = color;
+                    ctx.beginPath();
+                    ctx.moveTo(x2, y2);
+                    ctx.lineTo(x2 - headLen * ux + headLen * 0.4 * uy, y2 - headLen * uy - headLen * 0.4 * ux);
+                    ctx.lineTo(x2 - headLen * ux - headLen * 0.4 * uy, y2 - headLen * uy + headLen * 0.4 * ux);
+                    ctx.closePath();
+                    ctx.fill();
+                }
+
+                function drawJoint(x, y, radius, color) {
+                    // Outer glow
+                    ctx.save();
+                    ctx.shadowColor = color;
+                    ctx.shadowBlur = 16;
+                    ctx.fillStyle = color;
+                    ctx.globalAlpha = 0.3;
+                    ctx.beginPath(); ctx.arc(x, y, radius + 4, 0, Math.PI * 2); ctx.fill();
+                    ctx.restore();
+
+                    // Joint
+                    ctx.fillStyle = '#0a0e1a';
+                    ctx.beginPath(); ctx.arc(x, y, radius, 0, Math.PI * 2); ctx.fill();
+                    ctx.strokeStyle = color;
+                    ctx.lineWidth = 2.5;
+                    ctx.beginPath(); ctx.arc(x, y, radius, 0, Math.PI * 2); ctx.stroke();
+
+                    // Inner dot
+                    ctx.fillStyle = color;
+                    ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2); ctx.fill();
+                }
+
+                function drawAngleArc(x, y, startAngle, endAngle, radius, color) {
+                    if (Math.abs(endAngle - startAngle) < 0.01) return;
+                    ctx.beginPath();
+                    ctx.arc(x, y, radius, startAngle, endAngle, startAngle > endAngle);
+                    ctx.strokeStyle = color;
+                    ctx.globalAlpha = 0.5;
+                    ctx.lineWidth = 4;
+                    ctx.stroke();
+                    ctx.globalAlpha = 1.0;
+                }
+
+                function drawExoskeleton(fkNode, originX, originY, alpha) {
+                    if (!exoActive) return;
+                    ctx.save();
+                    ctx.globalAlpha = alpha;
+
+                    const hp = { x: originX + fkNode.hipPos.x, y: originY + fkNode.hipPos.y };
+                    const kp = { x: originX + fkNode.kneePos.x, y: originY + fkNode.kneePos.y };
+                    const ap = { x: originX + fkNode.anklePos.x, y: originY + fkNode.anklePos.y };
+
+                    // Metallic braces (slightly offset or thicker than the bone)
+                    ctx.strokeStyle = '#cfd8dc'; // metallic grey
+                    ctx.lineWidth = 4;
+                    ctx.lineCap = 'round';
+
+                    // Thigh brace
+                    ctx.beginPath(); ctx.moveTo(hp.x - 4, hp.y); ctx.lineTo(kp.x - 4, kp.y); ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(hp.x + 4, hp.y); ctx.lineTo(kp.x + 4, kp.y); ctx.stroke();
+
+                    // Shank brace
+                    ctx.beginPath(); ctx.moveTo(kp.x - 3, kp.y); ctx.lineTo(ap.x - 3, ap.y); ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(kp.x + 3, kp.y); ctx.lineTo(ap.x + 3, ap.y); ctx.stroke();
+
+                    // Exo Motors (large tech circles)
+                    function drawMotor(x, y, radius, colorInner) {
+                        ctx.fillStyle = '#263238'; // dark metal
+                        ctx.beginPath(); ctx.arc(x, y, radius, 0, Math.PI * 2); ctx.fill();
+                        ctx.lineWidth = 2; ctx.strokeStyle = '#90a4ae'; ctx.stroke();
+                        ctx.fillStyle = colorInner;
+                        ctx.beginPath(); ctx.arc(x, y, radius * 0.4, 0, Math.PI * 2); ctx.fill();
+                    }
+
+                    drawMotor(hp.x, hp.y, 14, '#00e5ff');
+                    drawMotor(kp.x, kp.y, 12, '#e040fb');
+                    drawMotor(ap.x, ap.y, 10, '#00e676');
+
+                    ctx.restore();
+                }
+
+                function drawFootTrail() {
+                    if (footTrail.length < 2) return;
+                    ctx.beginPath();
+                    ctx.strokeStyle = 'rgba(0, 230, 118, 0.3)';
+                    ctx.lineWidth = 2;
+                    for (let i = 0; i < footTrail.length; i++) {
+                        const pt = footTrail[i];
+                        if (i === 0) ctx.moveTo(pt.x, pt.y);
+                        else ctx.lineTo(pt.x, pt.y);
+                    }
+                    ctx.stroke();
+                }
+
+                function renderSim() {
+                    const w = canvas.width / devicePixelRatio;
+                    const h = canvas.height / devicePixelRatio;
+                    ctx.clearRect(0, 0, w, h);
+
+                    // Background grid
+                    drawGrid(w, h);
+
+                    // Get current angles
+                    let hip, knee, ankle;
+                    if (simMode === 'dynamic') {
+                        const joints = absoluteToJoint(dynState.q);
+                        hip = joints.hip;
+                        knee = joints.knee;
+                        ankle = joints.ankle;
+                    } else {
+                        hip = hipAngle(cyclePhase);
+                        knee = kneeAngle(cyclePhase);
+                        ankle = ankleAngle(cyclePhase);
+                    }
+
+                    // Forward kinematics
+                    const fk = forwardKinematics(hip, knee, ankle);
+
+                    // Dynamic floor: calculate lowest foot Y relative to hip
+                    // Use the exact physics engine collision hull (scaled to pixels) to prevent visual clipping
+                    const lowestY = getDynamicLowestY(legs) * 500;
+
+                    // Floor is fixed at h * 0.85
+                    const floorY = h * 0.85;
+                    const originY = floorY - lowestY;
+                    const originX = w * 0.4;
+
+                    // Draw Floor
+                    ctx.save();
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(0, floorY);
+                    ctx.lineTo(w, floorY);
+                    ctx.stroke();
+                    for (let cx = 0; cx < w; cx += 20) {
+                        ctx.beginPath();
+                        ctx.moveTo(cx, floorY);
+                        ctx.lineTo(cx - 10, floorY + 10);
+                        ctx.stroke();
+                    }
+                    ctx.fillStyle = 'rgba(255,255,255,0.2)';
+                    ctx.font = '10px Inter';
+                    ctx.fillText('Sol', 10, floorY - 5);
+                    ctx.restore();
+
+                    // Draw body reference (pelvis)
+                    ctx.fillStyle = 'rgba(0,229,255,0.08)';
+                    ctx.fillRect(originX - 30, originY - 30, 60, 30);
+                    ctx.strokeStyle = 'rgba(0,229,255,0.3)';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(originX - 30, originY - 30, 60, 30);
+                    ctx.fillStyle = 'rgba(0,229,255,0.4)';
+                    ctx.font = '10px Inter';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('Bassin', originX, originY - 16);
+
+                    // Transform FK positions to canvas coords
+                    const hp = { x: originX + fk.hipPos.x, y: originY + fk.hipPos.y };
+                    const kp = { x: originX + fk.kneePos.x, y: originY + fk.kneePos.y };
+                    const ap = { x: originX + fk.anklePos.x, y: originY + fk.anklePos.y };
+                    const tp = { x: originX + fk.toePos.x, y: originY + fk.toePos.y };
+
+                    // Foot trail (store absolute canvas coords)
+                    footTrail.push({ x: tp.x, y: tp.y });
+                    if (footTrail.length > TRAIL_LEN) footTrail.shift();
+                    drawFootTrail();
+
+                    // Draw segments
+                    drawSegment(hp.x, hp.y, kp.x, kp.y, '#00e5ff', 8);   // Cuisse
+                    drawSegment(kp.x, kp.y, ap.x, ap.y, '#e040fb', 7);   // Tibia
+                    drawParabolicFoot(ap, tp, '#00e676', 6);             // Pied parabolique
+                    if (simMode === 'dynamic') drawExoskeleton(fk, originX, originY, 1.0);
+
+                    // Draw angle arcs
+                    drawAngleArc(hp.x, hp.y, -Math.PI / 2, -Math.PI / 2 + hip * Math.PI / 180, 30, '#00e5ff');
+                    drawAngleArc(kp.x, kp.y, 0, knee * Math.PI / 180, 22, '#e040fb');
+
+                    // Draw joints
+                    drawJoint(hp.x, hp.y, 9, '#00e5ff');    // Hanche
+                    drawJoint(kp.x, kp.y, 8, '#e040fb');    // Genou
+                    drawJoint(ap.x, ap.y, 7, '#00e676');    // Cheville
+
+                    // Joint labels
+                    ctx.font = '11px Inter';
+                    ctx.textAlign = 'left';
+                    ctx.fillStyle = 'rgba(0,229,255,0.7)';
+                    ctx.fillText('Hanche', hp.x + 16, hp.y - 4);
+                    ctx.fillStyle = 'rgba(224,64,251,0.7)';
+                    ctx.fillText('Genou', kp.x + 14, kp.y - 4);
+                    ctx.fillStyle = 'rgba(0,230,118,0.7)';
+                    ctx.fillText('Cheville', ap.x + 12, ap.y - 4);
+
+                    // ── Ghost reference leg (dynamic mode only) ──
+                    if (simMode === 'dynamic') {
+                        const refHip = hipAngle(cyclePhase);
+                        const refKnee = kneeAngle(cyclePhase);
+                        const refAnkle = ankleAngle(cyclePhase);
+                        const rfk = forwardKinematics(refHip, refKnee, refAnkle);
+
+                        ctx.save();
+                        ctx.globalAlpha = 0.5;
+                        ctx.setLineDash([6, 4]);
+                        ctx.lineWidth = 3;
+                        // Thigh
+                        ctx.strokeStyle = '#ffd740';
+                        ctx.beginPath();
+                        ctx.moveTo(hp.x, hp.y);
+                        ctx.lineTo(originX + rfk.kneePos.x, originY + rfk.kneePos.y);
+                        ctx.stroke();
+                        // Shank
+                        ctx.beginPath();
+                        ctx.moveTo(originX + rfk.kneePos.x, originY + rfk.kneePos.y);
+                        ctx.lineTo(originX + rfk.anklePos.x, originY + rfk.anklePos.y);
+                        ctx.stroke();
+                        // Foot
+                        ctx.beginPath();
+                        ctx.moveTo(originX + rfk.anklePos.x, originY + rfk.anklePos.y);
+                        ctx.lineTo(originX + rfk.toePos.x, originY + rfk.toePos.y);
+                        ctx.stroke();
+                        ctx.setLineDash([]);
+                        ctx.restore();
+
+                        // Label
+                        ctx.fillStyle = 'rgba(255,215,64,0.6)';
+                        ctx.font = '10px Inter';
+                        ctx.fillText('Réf.', originX + rfk.toePos.x + 6, originY + rfk.toePos.y);
+                    }
+
+
+                    // ── GRF Data for Both Legs ──
+                    const bodyWeight = params.mass * g;
+                    let fVert0 = grfVertical(cyclePhase) / 100 * bodyWeight;
+                    let fAP0 = grfAP(cyclePhase) / 100 * bodyWeight;
+                    let isStance0 = cyclePhase < 0.62;
+
+                    const cPhase = (cyclePhase + 0.5) % 1;
+                    let fVert1 = grfVertical(cPhase) / 100 * bodyWeight;
+                    let fAP1 = grfAP(cPhase) / 100 * bodyWeight;
+                    let isStance1 = cPhase < 0.62;
+
+                    let cop0 = { x: tp.x, y: tp.y };
+                    let cop1_stored = null; // Stored to be assigned to tp2 later
+
+                    if (simMode === 'dynamic') {
+                        fVert0 = legs[0].grf ? legs[0].grf.fy : 0;
+                        fAP0 = legs[0].grf ? legs[0].grf.fx : 0;
+                        isStance0 = fVert0 > 1;
+                        if (isStance0 && legs[0].grf.copX !== undefined) {
+                            cop0 = { x: originX + legs[0].grf.copX * 500, y: originY + legs[0].grf.copY * 500 };
+                        }
+
+                        fVert1 = legs[1].grf ? legs[1].grf.fy : 0;
+                        fAP1 = legs[1].grf ? legs[1].grf.fx : 0;
+                        isStance1 = fVert1 > 1;
+                        if (isStance1 && legs[1].grf.copX !== undefined) {
+                            cop1_stored = { x: originX + legs[1].grf.copX * 500, y: originY + legs[1].grf.copY * 500 };
+                        }
+                    }
+
+
+                    // ── Second leg ──
+                    if (simMode === 'dynamic') {
+                        // Draw leg[1] as a solid colored leg
+                        const j2 = absoluteToJoint(legs[1].q);
+                        const fk2 = forwardKinematics(j2.hip, j2.knee, j2.ankle);
+                        const kp2 = { x: originX + fk2.kneePos.x, y: originY + fk2.kneePos.y };
+                        const ap2 = { x: originX + fk2.anklePos.x, y: originY + fk2.anklePos.y };
+                        const tp2 = { x: originX + fk2.toePos.x, y: originY + fk2.toePos.y };
+
+                        ctx.save();
+                        ctx.globalAlpha = 0.7;
+                        drawSegment(hp.x, hp.y, kp2.x, kp2.y, '#4dd0e1', 7);
+                        drawSegment(kp2.x, kp2.y, ap2.x, ap2.y, '#ce93d8', 6);
+                        drawParabolicFoot(ap2, tp2, '#69f0ae', 5);
+                        drawJoint(kp2.x, kp2.y, 7, '#4dd0e1');
+                        drawJoint(ap2.x, ap2.y, 6, '#ce93d8');
+                        ctx.restore();
+
+                        drawExoskeleton(fk2, originX, originY, 0.6);
+
+                        // GRF arrow for leg[1]
+                        if (isStance1 && fVert1 > 1) {
+                            const scale = 0.6;
+                            const cop1 = cop1_stored || { x: tp2.x, y: tp2.y };
+                            drawArrow(cop1.x, cop1.y, cop1.x + fAP1 * scale, cop1.y - fVert1 * scale, '#ff8a65', 3);
+                        }
+                    } else {
+                        // Kinematic mode: ghost contralateral leg
+                        const cfk = forwardKinematics(hipAngle(cPhase), kneeAngle(cPhase), ankleAngle(cPhase));
+                        const tp2 = { x: originX + cfk.toePos.x, y: originY + cfk.toePos.y };
+                        ctx.save();
+                        ctx.globalAlpha = 0.18;
+                        drawSegment(hp.x, hp.y, originX + cfk.kneePos.x, originY + cfk.kneePos.y, '#5c6380', 6);
+                        drawSegment(originX + cfk.kneePos.x, originY + cfk.kneePos.y, originX + cfk.anklePos.x, originY + cfk.anklePos.y, '#5c6380', 5);
+                        drawSegment(originX + cfk.anklePos.x, originY + cfk.anklePos.y, tp2.x, tp2.y, '#5c6380', 4);
+                        ctx.restore();
+
+                        // GRF arrow for leg[1]
+                        if (isStance1 && fVert1 > 1) {
+                            const scale = 0.6;
+                            drawArrow(tp2.x, tp2.y, tp2.x + fAP1 * scale, tp2.y - fVert1 * scale, '#ff8a65', 3);
+                        }
+                    }
+
+                    // ── Update readouts ──
+                    document.getElementById('angHip').innerHTML = `${hip.toFixed(1)}<span class="unit">°</span>`;
+                    document.getElementById('angKnee').innerHTML = `${knee.toFixed(1)}<span class="unit">°</span>`;
+                    document.getElementById('angAnkle').innerHTML = `${ankle.toFixed(1)}<span class="unit">°</span>`;
+
+                    // Torques
+                    let torques;
+                    if (simMode === 'dynamic') {
+                        torques = { hip: lastJointTorques[0], knee: lastJointTorques[1], ankle: lastJointTorques[2] };
+                    } else {
+                        torques = computeTorques(cyclePhase, 0.016);
+                    }
+                    document.getElementById('torqHip').innerHTML = `${torques.hip.toFixed(2)}<span class="unit"> N·m</span>`;
+                    document.getElementById('torqKnee').innerHTML = `${torques.knee.toFixed(2)}<span class="unit"> N·m</span>`;
+                    document.getElementById('torqAnkle').innerHTML = `${torques.ankle.toFixed(2)}<span class="unit"> N·m</span>`;
+
+                    // ── GRF computation and display ──
+                    document.getElementById('grfVert').innerHTML = `${fVert0.toFixed(1)}<span class="unit"> N</span>`;
+                    document.getElementById('grfAP').innerHTML = `${fAP0.toFixed(1)}<span class="unit"> N</span>`;
+                    document.getElementById('grfPhase').innerHTML = isStance0
+                        ? '<span style="color:#ffd740">Appui</span>'
+                        : '<span style="color:#b0bec5">Oscillation</span>';
+
+                    // Draw GRF vector arrow at foot contact point for Leg 0
+                    if (isStance0 && fVert0 > 1) {
+                        const scale = 0.6; // pixels per Newton
+                        const arrowX = cop0.x;
+                        const arrowY = cop0.y;
+                        const fx = fAP0 * scale;
+                        const fy = -fVert0 * scale;
+                        drawArrow(arrowX, arrowY, arrowX + fx, arrowY + fy, '#ffd740', 3);
+
+                        // Vertical component (subtle)
+                        ctx.save();
+                        ctx.globalAlpha = 0.3;
+                        ctx.setLineDash([3, 3]);
+                        ctx.strokeStyle = '#ffd740';
+                        ctx.lineWidth = 1;
+                        ctx.beginPath();
+                        ctx.moveTo(arrowX, arrowY);
+                        ctx.lineTo(arrowX, arrowY + fy);
+                        ctx.stroke();
+                        ctx.beginPath();
+                        ctx.moveTo(arrowX, arrowY);
+                        ctx.lineTo(arrowX + fx, arrowY);
+                        ctx.stroke();
+                        ctx.setLineDash([]);
+                        ctx.restore();
+
+                        // Force label
+                        ctx.fillStyle = 'rgba(255,215,64,0.8)';
+                        ctx.font = '10px Inter';
+                        ctx.textAlign = 'left';
+                        ctx.fillText(`${Math.sqrt(fVert0 * fVert0 + fAP0 * fAP0).toFixed(0)} N`, arrowX + fx + 6, arrowY + fy - 4);
+                    }
+
+                    // Phase info
+                    const pct = (cyclePhase * 100).toFixed(1);
+                    document.getElementById('cycleDisplay').textContent = `${pct}%`;
+                    document.getElementById('phaseFill').style.width = `${pct}%`;
+
+                    let phaseText = '';
+                    let phaseColor = '';
+                    if (cyclePhase < 0.1) { phaseText = 'Contact talon'; phaseColor = 'var(--accent-green)'; }
+                    else if (cyclePhase < 0.3) { phaseText = 'Mise en charge'; phaseColor = 'var(--accent-cyan)'; }
+                    else if (cyclePhase < 0.5) { phaseText = 'Appui milieu'; phaseColor = 'var(--accent-cyan)'; }
+                    else if (cyclePhase < 0.6) { phaseText = 'Poussée'; phaseColor = 'var(--accent-orange)'; }
+                    else if (cyclePhase < 0.75) { phaseText = 'Début oscillation'; phaseColor = 'var(--accent-magenta)'; }
+                    else if (cyclePhase < 0.9) { phaseText = 'Mi-oscillation'; phaseColor = 'var(--accent-magenta)'; }
+                    else { phaseText = 'Fin oscillation'; phaseColor = 'var(--accent-magenta)'; }
+
+                    document.getElementById('phaseLabel').textContent = phaseText;
+                    document.getElementById('phaseFill').style.background = `linear-gradient(90deg, ${phaseColor}, rgba(255,255,255,0.1))`;
+
+                    // ── History ──
+                    history.hip.push(hip);
+                    history.knee.push(knee);
+                    history.ankle.push(ankle);
+                    history.tHip.push(torques.hip);
+                    history.tKnee.push(torques.knee);
+                    history.tAnkle.push(torques.ankle);
+
+                    if (lastExoDebug) {
+                        history.pidRefHip.push(lastExoDebug.hip.ref); history.pidMeasHip.push(lastExoDebug.hip.meas);
+                        history.pidErrHip.push(lastExoDebug.hip.err); history.pidCmdHip.push(lastExoDebug.hip.cmd); history.pidVelHip.push(lastExoDebug.hip.vel);
+                        history.pidRefKnee.push(lastExoDebug.knee.ref); history.pidMeasKnee.push(lastExoDebug.knee.meas);
+                        history.pidErrKnee.push(lastExoDebug.knee.err); history.pidCmdKnee.push(lastExoDebug.knee.cmd); history.pidVelKnee.push(lastExoDebug.knee.vel);
+                    } else {
+                        history.pidRefHip.push(0); history.pidMeasHip.push(0); history.pidErrHip.push(0); history.pidCmdHip.push(0); history.pidVelHip.push(0);
+                        history.pidRefKnee.push(0); history.pidMeasKnee.push(0); history.pidErrKnee.push(0); history.pidCmdKnee.push(0); history.pidVelKnee.push(0);
+                    }
+
+                    if (history.hip.length > HISTORY_LEN) {
+                        history.hip.shift(); history.knee.shift(); history.ankle.shift();
+                        history.tHip.shift(); history.tKnee.shift(); history.tAnkle.shift();
+                        history.pidRefHip.shift(); history.pidMeasHip.shift(); history.pidErrHip.shift(); history.pidCmdHip.shift(); history.pidVelHip.shift();
+                        history.pidRefKnee.shift(); history.pidMeasKnee.shift(); history.pidErrKnee.shift(); history.pidCmdKnee.shift(); history.pidVelKnee.shift();
+                    }
+
+                    // Draw charts
+                    drawChart(ctxA, chartAnglesCanvas, [history.hip, history.knee, history.ankle], ['#00e5ff', '#e040fb', '#00e676'], -30, 70);
+                    drawChart(ctxT, chartTorquesCanvas, [history.tHip, history.tKnee, history.tAnkle], ['#00e5ff', '#e040fb', '#00e676'], -2, 5);
+                    drawCyclogram(ctxC, chartCyclogramCanvas, history.hip, history.knee);
+
+                    drawChart(ctxTrH, chartTrackingHipCanvas, [history.pidRefHip, history.pidMeasHip, history.pidErrHip, history.pidVelHip, history.pidCmdHip], ['#5c6380', '#e040fb', '#ff1744', '#ff9800', '#00e5ff'], -30, 80);
+                    drawChart(ctxTrK, chartTrackingKneeCanvas, [history.pidRefKnee, history.pidMeasKnee, history.pidErrKnee, history.pidVelKnee, history.pidCmdKnee], ['#5c6380', '#e040fb', '#ff1744', '#ff9800', '#00e5ff'], -30, 80);
+
+                    if (useAk60Motor) {
+                        drawAk60SaturationLines(ctxTrH, chartTrackingHipCanvas);
+                        drawAk60SaturationLines(ctxTrK, chartTrackingKneeCanvas);
+                    }
+
+                    if (stepTestActive) {
+                        const target = 45;
+                        const buffer = history.pidMeasKnee;
+                        if (buffer.length > 5) {
+                            const finalVal = buffer[buffer.length - 1];
+                            const maxVal = Math.max(...buffer);
+                            const overshoot = Math.max(0, ((maxVal - target) / target) * 100);
+                            const ssErr = Math.abs(target - finalVal);
+
+                            let t10 = -1, t90 = -1;
+                            for (let i = 0; i < buffer.length; i++) {
+                                if (t10 < 0 && buffer[i] >= target * 0.1) t10 = i;
+                                if (t90 < 0 && buffer[i] >= target * 0.9) t90 = i;
+                            }
+                            const cycleTime = 0.8 / params.speed;
+                            const dtVisual = cycleTime / HISTORY_LEN;
+                            const riseTime = (t90 >= 0 && t10 >= 0 && t90 >= t10) ? ((t90 - t10) * dtVisual * 1000).toFixed(0) + ' ms' : '--';
+
+                            let tSettling = buffer.length - 1;
+                            while (tSettling >= 0) {
+                                if (Math.abs(buffer[tSettling] - target) > target * 0.05) break;
+                                tSettling--;
+                            }
+                            tSettling++;
+                            const settlingTime = (tSettling < buffer.length - 10 && tSettling > 0 && Math.abs(finalVal - target) <= target * 0.05) ? ((buffer.length - tSettling) * dtVisual * 1000).toFixed(0) + ' ms' : '--';
+
+                            document.getElementById('metricOver').textContent = overshoot > 0 ? overshoot.toFixed(1) + '%' : '0.0%';
+                            document.getElementById('metricSs').textContent = ssErr.toFixed(2) + '°';
+                            document.getElementById('metricTr').textContent = riseTime;
+                            document.getElementById('metricTs').textContent = settlingTime;
+                        }
+                    }
+
+                    // ── Graph Modal Redraw ──
+                    if (activeModalGraph && graphModal.style.display === 'flex') {
+                        const mw = modalCanvas.parentElement.clientWidth;
+                        const mh = modalCanvas.parentElement.clientHeight;
+                        if (modalCanvas.width !== Math.floor(mw * devicePixelRatio) || modalCanvas.height !== Math.floor(mh * devicePixelRatio)) {
+                            modalCanvas.width = Math.floor(mw * devicePixelRatio);
+                            modalCanvas.height = Math.floor(mh * devicePixelRatio);
+                            ctxM.scale(devicePixelRatio, devicePixelRatio);
+                        }
+                        if (activeModalGraph === 'chartAngles') {
+                            drawChart(ctxM, modalCanvas, [history.hip, history.knee, history.ankle], ['#00e5ff', '#e040fb', '#00e676'], -30, 70);
+                        } else if (activeModalGraph === 'chartTorques') {
+                            drawChart(ctxM, modalCanvas, [history.tHip, history.tKnee, history.tAnkle], ['#00e5ff', '#e040fb', '#00e676'], -2, 5);
+                        } else if (activeModalGraph === 'chartCyclogram') {
+                            drawCyclogram(ctxM, modalCanvas, history.hip, history.knee);
+                        } else if (activeModalGraph === 'chartTrackingHip') {
+                            drawChart(ctxM, modalCanvas, [history.pidRefHip, history.pidMeasHip, history.pidErrHip, history.pidVelHip, history.pidCmdHip], ['#5c6380', '#e040fb', '#ff1744', '#ff9800', '#00e5ff'], -30, 80);
+                            if (useAk60Motor) drawAk60SaturationLines(ctxM, modalCanvas);
+                        } else if (activeModalGraph === 'chartTrackingKnee') {
+                            drawChart(ctxM, modalCanvas, [history.pidRefKnee, history.pidMeasKnee, history.pidErrKnee, history.pidVelKnee, history.pidCmdKnee], ['#5c6380', '#e040fb', '#ff1744', '#ff9800', '#00e5ff'], -30, 80);
+                            if (useAk60Motor) drawAk60SaturationLines(ctxM, modalCanvas);
+                        }
+                    }
+                }
+
+                function drawAk60SaturationLines(ctxTarget, canvasTarget) {
+                    const w = canvasTarget.width / devicePixelRatio;
+                    const h = canvasTarget.height / devicePixelRatio;
+                    const pad = { top: 12, bottom: 16, left: 24, right: 12 };
+                    const plotH = h - pad.top - pad.bottom;
+                    const sy = (val) => pad.top + plotH * (1 - (val - (-20)) / (80 - (-20)));
+
+                    ctxTarget.save();
+                    ctxTarget.setLineDash([4, 4]);
+                    ctxTarget.strokeStyle = 'rgba(255, 23, 68, 0.8)';
+                    ctxTarget.lineWidth = 1.5;
+                    ctxTarget.beginPath();
+                    ctxTarget.moveTo(pad.left, sy(9)); ctxTarget.lineTo(w - pad.right, sy(9));
+                    ctxTarget.moveTo(pad.left, sy(-9)); ctxTarget.lineTo(w - pad.right, sy(-9));
+                    ctxTarget.stroke();
+                    ctxTarget.restore();
+                }
+
+                // ────────────────────────────────────────────
+                // CHART DRAWING
+                // ────────────────────────────────────────────
+
+                function drawCyclogram(context, canvasEl, histX, histY) {
+                    const w = canvasEl.width / devicePixelRatio;
+                    const h = canvasEl.height / devicePixelRatio;
+                    context.clearRect(0, 0, w * devicePixelRatio, h * devicePixelRatio);
+                    context.save();
+
+                    const pad = { top: 12, bottom: 16, left: 24, right: 12 };
+                    const plotW = w - pad.left - pad.right;
+                    const plotH = h - pad.top - pad.bottom;
+
+                    // Typical clinical axis ranges
+                    const minX = -20, maxX = 50;  // X: Hip (Negative left, Positive right)
+                    const minY = -10, maxY = 80;  // Y: Knee (Negative bottom, Positive top)
+
+                    function sx(val) { return pad.left + plotW * ((val - minX) / (maxX - minX)); }
+                    function sy(val) { return pad.top + plotH * (1 - (val - minY) / (maxY - minY)); }
+
+                    // Background
+                    context.fillStyle = 'rgba(17,24,39,0.5)';
+                    context.fillRect(pad.left, pad.top, plotW, plotH);
+
+                    // Grid (Origin crossbars)
+                    context.strokeStyle = 'rgba(255,255,255,0.15)';
+                    context.lineWidth = 1;
+                    context.beginPath();
+                    context.moveTo(sx(0), pad.top); context.lineTo(sx(0), pad.top + plotH);
+                    context.moveTo(pad.left, sy(0)); context.lineTo(pad.left + plotW, sy(0));
+                    context.stroke();
+
+                    // Axis Labels
+                    context.fillStyle = 'rgba(158,167,192,0.6)';
+                    context.font = '9px JetBrains Mono';
+                    context.textAlign = 'right';
+                    context.fillText(minX, sx(minX) + 8, sy(0) + 10);
+                    context.fillText(maxX, sx(maxX), sy(0) + 10);
+                    context.fillText(maxY, sx(0) - 2, sy(maxY) + 6);
+                    context.fillText(minY, sx(0) - 2, sy(minY));
+
+                    // 1. Reference Loop (Ideal Healthy Gait)
+                    context.strokeStyle = 'rgba(158,167,192,0.4)';
+                    context.lineWidth = 1.5;
+                    context.beginPath();
+                    const STEPS = 40;
+                    for (let i = 0; i <= STEPS; i++) {
+                        const t = i / STEPS;
+                        const hRef = catmullRom(GAIT_HIP, t);
+                        const kRef = catmullRom(GAIT_KNEE, t);
+                        if (i === 0) context.moveTo(sx(hRef), sy(kRef));
+                        else context.lineTo(sx(hRef), sy(kRef));
+                    }
+                    context.stroke();
+
+                    // 2. Mark t=0 (Heel Strike) with a distinct dot
+                    const h0 = catmullRom(GAIT_HIP, 0);
+                    const k0 = catmullRom(GAIT_KNEE, 0);
+                    context.fillStyle = '#ff1744'; // Red dot
+                    context.beginPath(); context.arc(sx(h0), sy(k0), 3, 0, Math.PI * 2); context.fill();
+
+                    // 3. Real-time dynamic loop
+                    if (histX.length > 1) {
+                        context.strokeStyle = '#e040fb'; // Match knee line color
+                        context.lineWidth = 2;
+                        context.beginPath();
+                        for (let i = 0; i < histX.length; i++) {
+                            const px = sx(histX[i]);
+                            const py = sy(histY[i]);
+                            if (i === 0) context.moveTo(px, py);
+                            else context.lineTo(px, py);
+                        }
+                        context.stroke();
+
+                        // Current Point glowing indicator
+                        const cx = sx(histX[histX.length - 1]);
+                        const cy = sy(histY[histY.length - 1]);
+                        context.fillStyle = '#00e5ff'; // Cyan tip
+                        context.beginPath(); context.arc(cx, cy, 3.5, 0, Math.PI * 2); context.fill();
+                    }
+
+                    context.restore();
+                }
+
+                function drawChart(context, canvasEl, datasets, colors, minVal, maxVal) {
+                    const w = canvasEl.width / devicePixelRatio;
+                    const h = canvasEl.height / devicePixelRatio;
+                    context.clearRect(0, 0, w * devicePixelRatio, h * devicePixelRatio);
+                    context.save();
+
+                    const pad = { top: 8, bottom: 16, left: 32, right: 8 };
+                    const plotW = w - pad.left - pad.right;
+                    const plotH = h - pad.top - pad.bottom;
+
+                    // Background
+                    context.fillStyle = 'rgba(17,24,39,0.5)';
+                    context.fillRect(pad.left, pad.top, plotW, plotH);
+
+                    // Grid lines
+                    context.strokeStyle = 'rgba(42,49,80,0.5)';
+                    context.lineWidth = 0.5;
+                    const numGridH = 4;
+                    for (let i = 0; i <= numGridH; i++) {
+                        const y = pad.top + (plotH / numGridH) * i;
+                        context.beginPath(); context.moveTo(pad.left, y); context.lineTo(pad.left + plotW, y); context.stroke();
+
+                        // Y-axis labels
+                        const val = maxVal - (maxVal - minVal) * (i / numGridH);
+                        context.fillStyle = 'rgba(158,167,192,0.6)';
+                        context.font = '9px JetBrains Mono';
+                        context.textAlign = 'right';
+                        context.fillText(val.toFixed(0), pad.left - 4, y + 3);
+                    }
+
+                    // Zero line
+                    const zeroY = pad.top + plotH * (maxVal / (maxVal - minVal));
+                    if (zeroY > pad.top && zeroY < pad.top + plotH) {
+                        context.strokeStyle = 'rgba(255,255,255,0.15)';
+                        context.lineWidth = 1;
+                        context.setLineDash([3, 3]);
+                        context.beginPath(); context.moveTo(pad.left, zeroY); context.lineTo(pad.left + plotW, zeroY); context.stroke();
+                        context.setLineDash([]);
+                    }
+
+                    // Data lines
+                    datasets.forEach((data, idx) => {
+                        if (data.length < 2) return;
+                        context.strokeStyle = colors[idx];
+                        context.lineWidth = 1.5;
+                        context.globalAlpha = 0.85;
+                        context.beginPath();
+                        data.forEach((val, i) => {
+                            const x = pad.left + (i / HISTORY_LEN) * plotW;
+                            const y = pad.top + plotH * ((maxVal - val) / (maxVal - minVal));
+                            const clampedY = Math.max(pad.top, Math.min(pad.top + plotH, y));
+                            if (i === 0) context.moveTo(x, clampedY);
+                            else context.lineTo(x, clampedY);
+                        });
+                        context.stroke();
+                        context.globalAlpha = 1;
+                    });
+
+                    context.restore();
+                }
+
+                // ────────────────────────────────────────────
+                // ANIMATION LOOP
+                // ────────────────────────────────────────────
+
+                function update(timestamp) {
+                    if (!lastTime) lastTime = timestamp;
+                    let dt = (timestamp - lastTime) / 1000;
+                    lastTime = timestamp;
+                    dt = Math.min(dt, 0.05); // cap to avoid spiral of death
+
+                    if (playing) {
+                        const cycleDuration = 0.8 / params.speed;
+                        cyclePhase = (cyclePhase + dt / cycleDuration) % 1;
+
+                        if (simMode === 'dynamic') {
+                            // Sub-step physics for stability
+                            const physDt = 0.0005;
+                            const nSteps = Math.min(Math.ceil(dt / physDt), 100);
+                            const stepDt = dt / nSteps;
+                            for (let i = 0; i < nSteps; i++) {
+                                physicsStep(stepDt);
+                            }
+                        }
+                    }
+
+                    renderSim();
+                    requestAnimationFrame(update);
+                }
+
+                // ────────────────────────────────────────────
+                // EVENTS
+                // ────────────────────────────────────────────
+
+                btnPlay.addEventListener('click', () => {
+                    playing = !playing;
+                    btnPlay.textContent = playing ? '⏸' : '▶';
+                    btnPlay.classList.toggle('active', playing);
+                });
+
+                btnStep.addEventListener('click', () => {
+                    playing = false;
+                    btnPlay.textContent = '▶';
+                    btnPlay.classList.remove('active');
+                    cyclePhase = (cyclePhase + 0.005) % 1;
+                    renderSim();
+                });
+
+                btnReset.addEventListener('click', () => {
+                    cyclePhase = 0;
+                    footTrail.length = 0;
+                    history.hip.length = 0; history.knee.length = 0; history.ankle.length = 0;
+                    history.tHip.length = 0; history.tKnee.length = 0; history.tAnkle.length = 0;
+                    initDynState();
+                    renderSim();
+                });
+
+                // Sliders
+                function bindSlider(id, param, display, suffix, scale) {
+                    const slider = document.getElementById(id);
+                    const label = document.getElementById(display);
+                    slider.addEventListener('input', () => {
+                        const val = parseFloat(slider.value);
+                        params[param] = val * (scale || 1);
+                        label.textContent = `${val} ${suffix}`;
+                    });
+                }
+
+                bindSlider('sliderSpeed', 'speed', 'valSpeed', 'x', 1);
+                bindSlider('sliderThigh', 'thighLen', 'valThigh', 'cm', 0.01);
+                bindSlider('sliderShank', 'shankLen', 'valShank', 'cm', 0.01);
+                bindSlider('sliderFoot', 'footLen', 'valFoot', 'cm', 0.01);
+                bindSlider('sliderMass', 'mass', 'valMass', 'kg', 1);
+
+                // Exoskeleton controls
+                document.getElementById('toggleExo').addEventListener('change', (e) => {
+                    exoActive = e.target.checked;
+                    document.getElementById('exoBody').style.opacity = exoActive ? "1" : "0.5";
+                    document.getElementById('exoBody').style.pointerEvents = exoActive ? "auto" : "none";
+                });
+                document.getElementById('toggleAk60').addEventListener('change', (e) => {
+                    useAk60Motor = e.target.checked;
+                });
+                document.getElementById('sliderExoMass').addEventListener('input', (e) => {
+                    exoParams.mass = parseFloat(e.target.value);
+                    document.getElementById('valExoMass').textContent = exoParams.mass.toFixed(1) + " kg";
+                });
+                document.getElementById('sliderExoKp').addEventListener('input', (e) => {
+                    exoParams.kp = parseInt(e.target.value);
+                    document.getElementById('valExoKp').textContent = exoParams.kp;
+                });
+                document.getElementById('sliderExoKi').addEventListener('input', (e) => {
+                    exoParams.ki = parseInt(e.target.value);
+                    document.getElementById('valExoKi').textContent = exoParams.ki;
+                });
+                document.getElementById('sliderExoKd').addEventListener('input', (e) => {
+                    exoParams.kd = parseInt(e.target.value);
+                    document.getElementById('valExoKd').textContent = exoParams.kd;
+                });
+                document.getElementById('sliderExoDeadband').addEventListener('input', (e) => {
+                    exoParams.deadband = parseInt(e.target.value);
+                    document.getElementById('valExoDeadband').textContent = exoParams.deadband;
+                });
+
+                // Ankle lock toggle
+                document.getElementById('toggleAnkleLock').addEventListener('change', (e) => {
+                    params.ankleLocked = e.target.checked;
+                });
+
+                // Initialize dynamic mode panels
+                document.getElementById('pdCard').classList.add('visible');
+                document.getElementById('exoCard').style.display = 'block';
+                initDynState();
+
+                // PD gains sliders
+                document.getElementById('sliderKp').addEventListener('input', (e) => {
+                    pdGains.kp = parseFloat(e.target.value);
+                    document.getElementById('valKp').textContent = e.target.value;
+                });
+                document.getElementById('sliderKd').addEventListener('input', (e) => {
+                    pdGains.kd = parseFloat(e.target.value);
+                    document.getElementById('valKd').textContent = e.target.value;
+                });
+                document.getElementById('sliderDamp').addEventListener('input', (e) => {
+                    pdGains.damping = parseFloat(e.target.value);
+                    document.getElementById('valDamp').textContent = e.target.value;
+                });
+
+                // Pathological controls
+                document.getElementById('toggleCrouch').addEventListener('change', (e) => {
+                    params.isCrouchGait = e.target.checked;
+                });
+                document.getElementById('toggleWeakness').addEventListener('change', (e) => {
+                    params.weaknessEnabled = e.target.checked;
+                });
+                document.getElementById('sliderSpasticity').addEventListener('input', (e) => {
+                    params.spasticityLevel = parseInt(e.target.value);
+                    document.getElementById('valSpasticity').textContent = e.target.value;
+                });
+
+                // Resize
+                window.addEventListener('resize', () => { resizeCanvas(); resizeCharts(); });
+
+                // ── Modal & Export Logic ──
+                let activeModalGraph = null;
+                const graphModal = document.getElementById('graphModal');
+                const modalCanvas = document.getElementById('modalCanvas');
+                const ctxM = modalCanvas.getContext('2d');
+                const modalTitle = document.getElementById('modalTitle');
+
+                function setupModalTrigger(canvasEl, graphId, title) {
+                    canvasEl.style.cursor = 'pointer';
+                    canvasEl.title = "Cliquez pour agrandir";
+                    canvasEl.addEventListener('click', () => {
+                        activeModalGraph = graphId;
+                        modalTitle.textContent = title;
+                        graphModal.style.display = 'flex';
+                    });
+                }
+
+                setupModalTrigger(chartAnglesCanvas, 'chartAngles', 'Angles articulaires (°)');
+                setupModalTrigger(chartTorquesCanvas, 'chartTorques', 'Couples articulaires (N·m)');
+                setupModalTrigger(chartCyclogramCanvas, 'chartCyclogram', 'Cyclogramme (Hanche vs Genou)');
+                setupModalTrigger(chartTrackingHipCanvas, 'chartTrackingHip', 'Analyse PID Exo (Hanche)');
+                setupModalTrigger(chartTrackingKneeCanvas, 'chartTrackingKnee', 'Analyse PID Exo (Genou)');
+
+                document.getElementById('btnStepResponse').addEventListener('click', () => {
+                    stepTestActive = !stepTestActive;
+                    const btn = document.getElementById('btnStepResponse');
+                    const met = document.getElementById('stepMetrics');
+                    if (stepTestActive) {
+                        btn.innerHTML = '<span>🛑</span> Arrêter Test Échelon';
+                        btn.style.background = '#ff1744';
+                        met.style.display = 'block';
+                        // Reset metrics UI
+                        document.getElementById('metricTr').textContent = '--';
+                        document.getElementById('metricOver').textContent = '--';
+                        document.getElementById('metricTs').textContent = '--';
+                        document.getElementById('metricSs').textContent = '--';
+                        // Clear history to start fresh
+                        for (let key in history) history[key] = [];
+                    } else {
+                        btn.innerHTML = '<span>⚙️</span> Lancer Test Échelon';
+                        btn.style.background = 'var(--accent-magenta)';
+                        met.style.display = 'none';
+                        for (let key in history) history[key] = [];
+                    }
+                });
+
+                document.getElementById('closeModal').addEventListener('click', () => {
+                    graphModal.style.display = 'none';
+                    activeModalGraph = null;
+                });
+
+                document.getElementById('btnCapturePNG').addEventListener('click', () => {
+                    const link = document.createElement('a');
+                    link.download = `capture_${activeModalGraph}_${Date.now()}.png`;
+                    link.href = modalCanvas.toDataURL('image/png');
+                    link.click();
+                });
+
+                document.getElementById('btnExportCSV').addEventListener('click', () => {
+                    let csv = "";
+                    if (activeModalGraph === 'chartAngles') {
+                        csv = "TimeTick,Hip,Knee,Ankle\n";
+                        for (let i = 0; i < history.hip.length; i++) {
+                            csv += `${i},${history.hip[i].toFixed(2)},${history.knee[i].toFixed(2)},${history.ankle[i].toFixed(2)}\n`;
+                        }
+                    } else if (activeModalGraph === 'chartTorques') {
+                        csv = "TimeTick,Hip_Nm,Knee_Nm,Ankle_Nm\n";
+                        for (let i = 0; i < history.tHip.length; i++) {
+                            csv += `${i},${history.tHip[i].toFixed(2)},${history.tKnee[i].toFixed(2)},${history.tAnkle[i].toFixed(2)}\n`;
+                        }
+                    } else if (activeModalGraph === 'chartCyclogram') {
+                        csv = "TimeTick,Hip_deg_X,Knee_deg_Y\n";
+                        for (let i = 0; i < history.hip.length; i++) {
+                            csv += `${i},${history.hip[i].toFixed(2)},${history.knee[i].toFixed(2)}\n`;
+                        }
+                    } else if (activeModalGraph === 'chartTrackingHip') {
+                        csv = "TimeTick,Cons_Hip_deg,Mes_Hip_deg,Err_Hip_deg,Vel_Hip_rads,Cmd_Hip_Nm\n";
+                        for (let i = 0; i < history.pidRefHip.length; i++) {
+                            csv += `${i},${history.pidRefHip[i].toFixed(2)},${history.pidMeasHip[i].toFixed(2)},${history.pidErrHip[i].toFixed(2)},${history.pidVelHip[i].toFixed(2)},${history.pidCmdHip[i].toFixed(2)}\n`;
+                        }
+                    } else if (activeModalGraph === 'chartTrackingKnee') {
+                        csv = "TimeTick,Cons_Knee_deg,Mes_Knee_deg,Err_Knee_deg,Vel_Knee_rads,Cmd_Knee_Nm\n";
+                        for (let i = 0; i < history.pidRefKnee.length; i++) {
+                            csv += `${i},${history.pidRefKnee[i].toFixed(2)},${history.pidMeasKnee[i].toFixed(2)},${history.pidErrKnee[i].toFixed(2)},${history.pidVelKnee[i].toFixed(2)},${history.pidCmdKnee[i].toFixed(2)}\n`;
+                        }
+                    }
+                    const blob = new Blob([csv], { type: 'text/csv' });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `export_${activeModalGraph}_${Date.now()}.csv`;
+                    link.click();
+                    URL.revokeObjectURL(url);
+                });
+
+                // ── Init ──
+                resizeCanvas();
+                resizeCharts();
+                renderSim();
+                requestAnimationFrame(update);
+
+                // Auto-play after a short delay for first impression
+                setTimeout(() => {
+                    playing = true;
+                    btnPlay.textContent = '⏸';
+                    btnPlay.classList.add('active');
+                }, 500);
+
+            })();
+        </script>
+
+    </div> <!-- /tabSimulator -->
+
+    <!-- ══════════════════════════════════════════════════ -->
+    <!-- TAB: ENGINEERING & MATHEMATICS                     -->
+    <!-- ══════════════════════════════════════════════════ -->
+    <div id="tabEngineering" class="tab-content">
+        <div class="eng-panel">
+            <h2>1. Modèle Biomécanique : Triple Pendule Inversé</h2>
+            <p>Le membre inférieur est modélisé comme un <strong>triple pendule inversé plan</strong> à 3 degrés de
+                liberté : la cuisse (segment 1), le tibia (segment 2) et le pied (segment 3). Chaque segment possède une
+                masse \(m_i\), une longueur \(L_i\), et un centre de masse situé à \(l_{ci}\) de l'articulation
+                proximale.</p>
+            <h3>Paramètres Anthropométriques (Enfant 4-6 ans)</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Segment</th>
+                        <th>Longueur</th>
+                        <th>Masse</th>
+                        <th>Centre de Masse</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Cuisse (1)</td>
+                        <td>\(L_1 = 0.22 \, m\)</td>
+                        <td>\(m_1 = 0.10 \cdot M_{total}\)</td>
+                        <td>\(l_{c1} = 0.5 \cdot L_1\)</td>
+                    </tr>
+                    <tr>
+                        <td>Tibia (2)</td>
+                        <td>\(L_2 = 0.22 \, m\)</td>
+                        <td>\(m_2 = 0.06 \cdot M_{total}\)</td>
+                        <td>\(l_{c2} = 0.5 \cdot L_2\)</td>
+                    </tr>
+                    <tr>
+                        <td>Pied (3)</td>
+                        <td>\(L_3 = 0.15 \, m\)</td>
+                        <td>\(m_3 = 0.02 \cdot M_{total}\)</td>
+                        <td>\(l_{c3} = 0.5 \cdot L_3\)</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>2. Équations du Mouvement (Euler-Lagrange)</h2>
+            <p>La dynamique du système est décrite par l'équation matricielle fondamentale :</p>
+            <div class="eq-block">
+                \[ M(\mathbf{q})\ddot{\mathbf{q}} + C(\mathbf{q}, \dot{\mathbf{q}}) + G(\mathbf{q}) =
+                \boldsymbol{\tau}_{patient} + \boldsymbol{\tau}_{exo} + \boldsymbol{\tau}_{GRF} \]
+            </div>
+            <p>Où \(\mathbf{q} = [q_1, q_2, q_3]^T\) sont les coordonnées absolues des segments (angles par rapport à la
+                verticale).</p>
+
+            <h3>Matrice d'Inertie \(M(\mathbf{q})\)</h3>
+            <p>Chaque élément \(M_{ij}\) est calculé via le théorème de Huygens-Steiner :</p>
+            <div class="eq-block">
+                \[ M_{11} = (m_1 l_{c1}^2 + m_2 L_1^2 + m_3 L_1^2) + I_1 \]
+                \[ M_{12} = (m_2 L_1 l_{c2} + m_3 L_1 L_2) \cos(q_1 - q_2) \]
+                \[ M_{22} = (m_2 l_{c2}^2 + m_3 L_2^2) + I_2 \]
+                \[ M_{13} = m_3 L_1 l_{c3} \cos(q_1 - q_3) \]
+                \[ M_{23} = m_3 L_2 l_{c3} \cos(q_2 - q_3) \]
+                \[ M_{33} = m_3 l_{c3}^2 + I_3 \]
+            </div>
+
+            <h3>Vecteur Gravitationnel \(G(\mathbf{q})\)</h3>
+            <div class="eq-block">
+                \[ G_1 = -(m_1 l_{c1} + m_2 L_1 + m_3 L_1) \cdot g \cdot \sin(q_1) \]
+                \[ G_2 = -(m_2 l_{c2} + m_3 L_2) \cdot g \cdot \sin(q_2) \]
+                \[ G_3 = -m_3 l_{c3} \cdot g \cdot \sin(q_3) \]
+            </div>
+
+            <h3>Termes de Coriolis/Centripètes \(C(\mathbf{q}, \dot{\mathbf{q}})\)</h3>
+            <div class="eq-block">
+                \[ C_1 = M_{12} \cdot \dot{q_2}^2 \cdot \sin(q_1 - q_2) + M_{13} \cdot \dot{q_3}^2 \cdot \sin(q_1 - q_3)
+                \]
+                \[ C_2 = -M_{12} \cdot \dot{q_1}^2 \cdot \sin(q_1 - q_2) + M_{23} \cdot \dot{q_3}^2 \cdot \sin(q_2 -
+                q_3) \]
+                \[ C_3 = -M_{13} \cdot \dot{q_1}^2 \cdot \sin(q_1 - q_3) - M_{23} \cdot \dot{q_2}^2 \cdot \sin(q_2 -
+                q_3) \]
+            </div>
+
+            <h2>3. Contrôle du Patient : Computed Torque Control (CTC)</h2>
+            <p>Le patient <em>sain</em> compense parfaitement la gravité et l'inertie grâce à un contrôleur en couple
+                calculé :</p>
+            <div class="eq-block">
+                \[ \boldsymbol{\tau}_{patient} = M(\mathbf{q}) \left[ \ddot{\mathbf{q}}_{ref} + K_p(\mathbf{q}_{ref} -
+                \mathbf{q}) + K_d(\dot{\mathbf{q}}_{ref} - \dot{\mathbf{q}}) \right] + C(\mathbf{q}, \dot{\mathbf{q}}) +
+                G(\mathbf{q}) \]
+            </div>
+            <p>Ce choix annule les non-linéarités du système et rend la dynamique en boucle fermée <strong>linéaire et
+                    découplée</strong>.</p>
+
+            <h3>Modèle Pathologique (Parésie & Spasticité)</h3>
+            <p>Un patient pathologique utilise un simple contrôleur <strong>PD articulaire</strong> avec un gain réduit
+                à 30% (parésie) et un terme de résistance à la vitesse (spasticité) :</p>
+            <div class="eq-block">
+                \[ \tau_{i}^{pat} = K_p^{eff} \cdot (q_{ref,i} - q_i) + K_d \cdot (\dot{q}_{ref,i} - \dot{q}_i) -
+                \lambda_{spast} \cdot \dot{q}_i \quad (\text{si extension}) \]
+            </div>
+
+            <h2>4. Contrôle de l'Exosquelette : PID Assist-As-Needed (AAN)</h2>
+            <p>L'exosquelette utilise une architecture PID avec bande morte (deadband) pour n'assister que lorsque
+                l'erreur dépasse un seuil toléré :</p>
+            <div class="eq-block">
+                \[ e_i = q_{ref,i} - q_{meas,i} \]
+                \[ e_{eff,i} = \begin{cases} 0 & \text{si } |e_i| \leq \delta_{tol} \\ e_i - \text{sign}(e_i) \cdot
+                \delta_{tol} & \text{sinon} \end{cases} \]
+                \[ \tau_{assist,i} = K_p \cdot e_{eff,i} + K_i \int e_{eff,i} \, dt + K_d \cdot \dot{e}_{eff,i} \]
+            </div>
+            <p>La composante de <strong>transparence</strong> annule le poids propre de l'exosquelette :</p>
+            <div class="eq-block">
+                \[ \boldsymbol{\tau}_{exo} = \boldsymbol{\tau}_{assist} + G_{exo}(\mathbf{q}) \]
+            </div>
+
+            <h2>5. Modèle du Moteur CubeMars AK60-6</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Paramètre</th>
+                        <th>Valeur</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Couple max.</td>
+                        <td>\(T_{max} = 9.0 \, N \cdot m\)</td>
+                        <td>Couple de pointe au réducteur</td>
+                    </tr>
+                    <tr>
+                        <td>Vitesse à vide</td>
+                        <td>\(\omega_{NL} = 33.5 \, rad/s\)</td>
+                        <td>320 RPM au réducteur 6:1</td>
+                    </tr>
+                    <tr>
+                        <td>Masse par jambe</td>
+                        <td>\(1.5 \, kg\)</td>
+                        <td>Poids réel du moteur + structure</td>
+                    </tr>
+                </tbody>
+            </table>
+            <h3>Courbe de Saturation (Back-EMF)</h3>
+            <div class="eq-block">
+                \[ T_{max}(\dot{\theta}) = T_{peak} \cdot \max\left(0, \; 1 - \frac{|\dot{\theta}|}{\omega_{NL}}\right)
+                \]
+            </div>
+            <p>Le couple de commande est ensuite écrêté : \(\tau_{cmd} = \text{clamp}(\tau_{PID}, \,
+                -T_{max}(\dot{\theta}), \, +T_{max}(\dot{\theta}))\)</p>
+
+            <h2>6. Forces de Réaction au Sol (GRF)</h2>
+            <p>Le contact au sol est modélisé par un modèle <strong>ressort-amortisseur distribué</strong>
+                (Hunt-Crossley simplifié) :</p>
+            <div class="eq-block">
+                \[ F_y = K \cdot \delta_y + B \cdot \dot{\delta}_y \qquad (K = 15000 \, N/m, \; B = 500 \, Ns/m) \]
+                \[ F_x = -\mu \cdot F_y \cdot \text{tanh}(5 \cdot v_x) - B_{friction} \cdot v_x \]
+            </div>
+            <p>La pénétration de référence est calculée pour que le sol supporte exactement 1.05× le poids corporel :
+                \(\delta_{ref} = \frac{m \cdot g \cdot 1.05}{K}\)</p>
+
+            <h2>7. Cinématique de Marche (Tables Spline)</h2>
+            <p>Les trajectoires de référence sont des données cliniques pédiatriques (Winter, 1991) interpolées par
+                <strong>splines de Catmull-Rom cycliques</strong>. Le cycle de marche est normalisé à \(t \in [0, 1]\),
+                avec 21 points d'ancrage à intervalles de 5%.
+            </p>
+            <div class="eq-block">
+                \[ q_{ref}(t) = \text{CatmullRom}(\text{DATA}_{joint}, \; t) \]
+            </div>
+
+            <h2>8. Intégration Numérique</h2>
+            <p>Le solveur utilise une intégration d'<strong>Euler semi-implicite</strong> avec sous-pas de \(dt = 0.005
+                \, s\) (8 étapes par frame à 60 FPS) :</p>
+            <div class="eq-block">
+                \[ \ddot{\mathbf{q}} = M^{-1}(\mathbf{q}) \left[ \boldsymbol{\tau}_{total} - C(\mathbf{q},
+                \dot{\mathbf{q}}) - G(\mathbf{q}) \right] \]
+                \[ \dot{\mathbf{q}}_{n+1} = \dot{\mathbf{q}}_n + \ddot{\mathbf{q}} \cdot dt \]
+                \[ \mathbf{q}_{n+1} = \mathbf{q}_n + \dot{\mathbf{q}}_{n+1} \cdot dt \]
+            </div>
+        </div>
+    </div> <!-- /tabEngineering -->
+
+    <!-- ══════════════════════════════════════ -->
+    <!-- USAGE FOOTER                          -->
+    <!-- ══════════════════════════════════════ -->
+    <div class="usage-footer">
+        <h3>📖 Guide d'utilisation</h3>
+        <ol>
+            <li><strong>Lancez la simulation</strong> — elle démarre automatiquement. Utilisez les boutons ▶/⏸ pour
+                contrôler la lecture.</li>
+            <li><strong>Activez les pathologies</strong> — cochez <em>Crouch Gait</em> et <em>Parésie</em> pour observer
+                la dégradation de la marche. Cliquez sur les boutons <em>(i)</em> pour comprendre chaque pathologie.
+            </li>
+            <li><strong>Branchez l'Exosquelette</strong> — activez le toggle dans le panneau vert. L'exo tente de
+                corriger la trajectoire vers un patron de marche sain.</li>
+            <li><strong>Réglez les gains PID</strong> — ajustez <em>Kp, Ki, Kd</em> et la <em>Bande Morte</em> pour
+                observer l'impact sur le couple de commande et la précision du suivi.</li>
+            <li><strong>Testez la réponse échelon</strong> — cliquez sur <em>⚙️ Lancer Test Échelon</em> pour mesurer
+                les performances dynamiques (temps de montée, dépassement).</li>
+            <li><strong>Analysez les résultats</strong> — cliquez sur n'importe quel graphique pour l'agrandir. Exportez
+                les données en <em>CSV</em> ou capturez en <em>PNG</em>.</li>
+            <li><strong>Consultez la théorie</strong> — cliquez sur l'onglet <em>📐 Ingénierie & Mathématiques</em> pour
+                voir toutes les équations du modèle.</li>
+        </ol>
+        <p style="margin-top:16px; color: var(--text-muted);">
+            💡 <strong>Objectif pédagogique :</strong> Ce simulateur permet de comprendre les défis de l'assistance
+            robotique à la marche pathologique pédiatrique.
+            Il met en évidence les compromis entre <em>transparence mécanique</em>, <em>saturation d'actionneurs</em> et
+            <em>qualité du suivi de trajectoire</em> dans un contexte d'exosquelette à faible coût (CubeMars AK60-6).
+        </p>
+    </div>
+
+    <div
+        style="text-align:center; padding: 20px 0; color: rgba(255,255,255,0.15); font-size: 12px; font-family: 'Inter', sans-serif; letter-spacing: 0.5px;">
+        Nicolas Dellagiovanna
+    </div>
+
+    <script>
+        // ── Tab Navigation Logic ──
+        document.querySelectorAll('.tab-nav button').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.tab-nav button').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+                btn.classList.add('active');
+                document.getElementById(btn.dataset.tab).classList.add('active');
+            });
+        });
+
+        // ── Info Button Logic ──
+        const infoData = {
+            crouch: {
+                title: '⚠️ Marche Fléchie (Crouch Gait)',
+                body: `<p>Le <strong>Crouch Gait</strong> (marche accroupie) est le patron de marche pathologique le plus fréquent chez les enfants atteints de <strong>paralysie cérébrale</strong> (GMFCS niveaux II-III).</p>
+            <p><strong>Caractéristiques :</strong></p>
+            <ul>
+                <li>Flexion excessive et permanente du <strong>genou</strong> (30-50° au lieu de ~5° en phase d'appui)</li>
+                <li>Flexion excessive de la <strong>hanche</strong> pour compenser</li>
+                <li>Augmentation drastique de la <strong>dépense énergétique</strong> (jusqu'à 3× la normale)</li>
+                <li>Raccourcissement de la longueur du pas</li>
+            </ul>
+            <p><strong>Dans le simulateur :</strong> Active un décalage de +25° sur la flexion du genou et +15° sur la hanche, tout au long du cycle de marche.</p>`
+            },
+            paresie: {
+                title: '⚠️ Faiblesse Musculaire (Parésie)',
+                body: `<p>La <strong>parésie</strong> est une diminution de la force musculaire volontaire, fréquente dans les atteintes du <strong>motoneurone supérieur</strong> (paralysie cérébrale, AVC, lésion médullaire).</p>
+            <p><strong>Mécanisme :</strong></p>
+            <ul>
+                <li>Réduction du recrutement des unités motrices</li>
+                <li>Le patient ne peut générer que <strong>30%</strong> de la force musculaire normale</li>
+                <li>Incapacité à compenser la gravité → effondrement progressif de la posture</li>
+            </ul>
+            <p><strong>Dans le simulateur :</strong> Le gain du contrôleur musculaire (Kp) est réduit à 30% de sa valeur nominale. Le patient ne peut plus maintenir sa posture sans aide externe.</p>`
+            },
+            spasticite: {
+                title: '⚠️ Spasticité du Genou',
+                body: `<p>La <strong>spasticité</strong> est une augmentation anormale du tonus musculaire qui dépend de la <strong>vitesse d'étirement</strong> du muscle. C'est un signe cardinal de l'atteinte du motoneurone supérieur.</p>
+            <p><strong>Mécanisme :</strong></p>
+            <ul>
+                <li>Réflexe d'étirement exagéré et non régulé</li>
+                <li>Le muscle résiste de plus en plus fort quand on essaie de l'étendre rapidement</li>
+                <li>Formule : <strong>τ<sub>spast</sub> = λ · |ω|</strong> (résistance proportionnelle à la vitesse angulaire)</li>
+            </ul>
+            <p><strong>Dans le simulateur :</strong> Un couple résistif proportionnel à la vitesse d'extension du genou est ajouté. Cela freine la phase d'oscillation et empêche le genou de s'étendre complètement.</p>`
+            }
+        };
+
+        document.querySelectorAll('.info-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const key = btn.dataset.info;
+                const data = infoData[key];
+                if (data) {
+                    document.getElementById('infoTitle').textContent = data.title;
+                    document.getElementById('infoBody').innerHTML = data.body;
+                    document.getElementById('infoOverlay').classList.add('visible');
+                }
+            });
+        });
+        document.getElementById('closeInfo').addEventListener('click', () => {
+            document.getElementById('infoOverlay').classList.remove('visible');
+        });
+        document.getElementById('infoOverlay').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) {
+                document.getElementById('infoOverlay').classList.remove('visible');
+            }
+        });
+    </script>
+
+</body>
+
+</html>
