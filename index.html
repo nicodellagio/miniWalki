@@ -1174,7 +1174,7 @@
                                 <div class="legend-dot" style="background:#ff1744"></div>Err(°)
                             </div>
                             <div class="legend-item">
-                                <div class="legend-dot" style="background:var(--accent-orange)"></div>Vit(rad/s)
+                                <div class="legend-dot" style="background:var(--accent-orange)"></div>Vit(RPM)
                             </div>
                             <div class="legend-item">
                                 <div class="legend-dot" style="background:#00e5ff"></div>Cmd(N·m)
@@ -1195,7 +1195,7 @@
                                 <div class="legend-dot" style="background:#ff1744"></div>Err(°)
                             </div>
                             <div class="legend-item">
-                                <div class="legend-dot" style="background:var(--accent-orange)"></div>Vit(rad/s)
+                                <div class="legend-dot" style="background:var(--accent-orange)"></div>Vit(RPM)
                             </div>
                             <div class="legend-item">
                                 <div class="legend-dot" style="background:#00e5ff"></div>Cmd(N·m)
@@ -2483,9 +2483,9 @@
 
                     if (lastExoDebug) {
                         history.pidRefHip.push(lastExoDebug.hip.ref); history.pidMeasHip.push(lastExoDebug.hip.meas);
-                        history.pidErrHip.push(lastExoDebug.hip.err); history.pidCmdHip.push(lastExoDebug.hip.cmd); history.pidVelHip.push(lastExoDebug.hip.vel);
+                        history.pidErrHip.push(lastExoDebug.hip.err); history.pidCmdHip.push(lastExoDebug.hip.cmd); history.pidVelHip.push(lastExoDebug.hip.vel * 9.549);
                         history.pidRefKnee.push(lastExoDebug.knee.ref); history.pidMeasKnee.push(lastExoDebug.knee.meas);
-                        history.pidErrKnee.push(lastExoDebug.knee.err); history.pidCmdKnee.push(lastExoDebug.knee.cmd); history.pidVelKnee.push(lastExoDebug.knee.vel);
+                        history.pidErrKnee.push(lastExoDebug.knee.err); history.pidCmdKnee.push(lastExoDebug.knee.cmd); history.pidVelKnee.push(lastExoDebug.knee.vel * 9.549);
                     } else {
                         history.pidRefHip.push(0); history.pidMeasHip.push(0); history.pidErrHip.push(0); history.pidCmdHip.push(0); history.pidVelHip.push(0);
                         history.pidRefKnee.push(0); history.pidMeasKnee.push(0); history.pidErrKnee.push(0); history.pidCmdKnee.push(0); history.pidVelKnee.push(0);
@@ -2500,11 +2500,11 @@
 
                     // Draw charts
                     drawChart(ctxA, chartAnglesCanvas, [history.hip, history.knee, history.ankle], ['#00e5ff', '#e040fb', '#00e676'], -30, 70);
-                    drawChart(ctxT, chartTorquesCanvas, [history.tHip, history.tKnee, history.tAnkle], ['#00e5ff', '#e040fb', '#00e676'], -2, 5);
+                    drawTorqueChart(ctxT, chartTorquesCanvas, [history.tHip, history.tKnee, history.tAnkle], ['#00e5ff', '#e040fb', '#00e676'], ['Hanche', 'Genou', 'Cheville']);
                     drawCyclogram(ctxC, chartCyclogramCanvas, history.hip, history.knee);
 
-                    drawChart(ctxTrH, chartTrackingHipCanvas, [history.pidRefHip, history.pidMeasHip, history.pidErrHip, history.pidVelHip, history.pidCmdHip], ['#5c6380', '#e040fb', '#ff1744', '#ff9800', '#00e5ff'], -30, 80);
-                    drawChart(ctxTrK, chartTrackingKneeCanvas, [history.pidRefKnee, history.pidMeasKnee, history.pidErrKnee, history.pidVelKnee, history.pidCmdKnee], ['#5c6380', '#e040fb', '#ff1744', '#ff9800', '#00e5ff'], -30, 80);
+                    drawTrackingChart(ctxTrH, chartTrackingHipCanvas, [history.pidRefHip, history.pidMeasHip, history.pidErrHip, history.pidVelHip, history.pidCmdHip], ['#5c6380', '#e040fb', '#ff1744', '#ff9800', '#00e5ff'], -30, 80, -100, 350);
+                    drawTrackingChart(ctxTrK, chartTrackingKneeCanvas, [history.pidRefKnee, history.pidMeasKnee, history.pidErrKnee, history.pidVelKnee, history.pidCmdKnee], ['#5c6380', '#e040fb', '#ff1744', '#ff9800', '#00e5ff'], -30, 80, -100, 350);
 
                     if (useAk60Motor) {
                         drawAk60SaturationLines(ctxTrH, chartTrackingHipCanvas);
@@ -2556,14 +2556,14 @@
                         if (activeModalGraph === 'chartAngles') {
                             drawChart(ctxM, modalCanvas, [history.hip, history.knee, history.ankle], ['#00e5ff', '#e040fb', '#00e676'], -30, 70);
                         } else if (activeModalGraph === 'chartTorques') {
-                            drawChart(ctxM, modalCanvas, [history.tHip, history.tKnee, history.tAnkle], ['#00e5ff', '#e040fb', '#00e676'], -2, 5);
+                            drawTorqueChart(ctxM, modalCanvas, [history.tHip, history.tKnee, history.tAnkle], ['#00e5ff', '#e040fb', '#00e676'], ['Hanche', 'Genou', 'Cheville']);
                         } else if (activeModalGraph === 'chartCyclogram') {
                             drawCyclogram(ctxM, modalCanvas, history.hip, history.knee);
                         } else if (activeModalGraph === 'chartTrackingHip') {
-                            drawChart(ctxM, modalCanvas, [history.pidRefHip, history.pidMeasHip, history.pidErrHip, history.pidVelHip, history.pidCmdHip], ['#5c6380', '#e040fb', '#ff1744', '#ff9800', '#00e5ff'], -30, 80);
+                            drawTrackingChart(ctxM, modalCanvas, [history.pidRefHip, history.pidMeasHip, history.pidErrHip, history.pidVelHip, history.pidCmdHip], ['#5c6380', '#e040fb', '#ff1744', '#ff9800', '#00e5ff'], -30, 80, -100, 350);
                             if (useAk60Motor) drawAk60SaturationLines(ctxM, modalCanvas);
                         } else if (activeModalGraph === 'chartTrackingKnee') {
-                            drawChart(ctxM, modalCanvas, [history.pidRefKnee, history.pidMeasKnee, history.pidErrKnee, history.pidVelKnee, history.pidCmdKnee], ['#5c6380', '#e040fb', '#ff1744', '#ff9800', '#00e5ff'], -30, 80);
+                            drawTrackingChart(ctxM, modalCanvas, [history.pidRefKnee, history.pidMeasKnee, history.pidErrKnee, history.pidVelKnee, history.pidCmdKnee], ['#5c6380', '#e040fb', '#ff1744', '#ff9800', '#00e5ff'], -30, 80, -100, 350);
                             if (useAk60Motor) drawAk60SaturationLines(ctxM, modalCanvas);
                         }
                     }
@@ -2572,9 +2572,9 @@
                 function drawAk60SaturationLines(ctxTarget, canvasTarget) {
                     const w = canvasTarget.width / devicePixelRatio;
                     const h = canvasTarget.height / devicePixelRatio;
-                    const pad = { top: 12, bottom: 16, left: 24, right: 12 };
+                    const pad = { top: 10, bottom: 16, left: 36, right: 42 };
                     const plotH = h - pad.top - pad.bottom;
-                    const sy = (val) => pad.top + plotH * (1 - (val - (-20)) / (80 - (-20)));
+                    const sy = (val) => pad.top + plotH * (1 - (val - (-30)) / (80 - (-30)));
 
                     ctxTarget.save();
                     ctxTarget.setLineDash([4, 4]);
@@ -2590,6 +2590,254 @@
                 // ────────────────────────────────────────────
                 // CHART DRAWING
                 // ────────────────────────────────────────────
+
+                // Auto-scaling torque chart with better precision
+                function drawTorqueChart(context, canvasEl, datasets, colors, labels) {
+                    const w = canvasEl.width / devicePixelRatio;
+                    const h = canvasEl.height / devicePixelRatio;
+                    context.clearRect(0, 0, w * devicePixelRatio, h * devicePixelRatio);
+                    context.save();
+
+                    const pad = { top: 10, bottom: 16, left: 40, right: 10 };
+                    const plotW = w - pad.left - pad.right;
+                    const plotH = h - pad.top - pad.bottom;
+
+                    // ── Auto-scale: compute min/max from all data ──
+                    let dataMin = Infinity, dataMax = -Infinity;
+                    datasets.forEach(data => {
+                        for (let i = 0; i < data.length; i++) {
+                            if (data[i] < dataMin) dataMin = data[i];
+                            if (data[i] > dataMax) dataMax = data[i];
+                        }
+                    });
+                    // Fallback if no data yet
+                    if (!isFinite(dataMin)) { dataMin = -5; dataMax = 10; }
+                    // Add margin (20%) and snap to nice numbers
+                    const range = dataMax - dataMin || 1;
+                    const margin = range * 0.2;
+                    let minVal = dataMin - margin;
+                    let maxVal = dataMax + margin;
+                    // Snap to multiples of the step for clean grid
+                    const rawStep = (maxVal - minVal) / 6;
+                    const step = rawStep <= 0.5 ? 0.5 : rawStep <= 1 ? 1 : rawStep <= 2 ? 2 : rawStep <= 5 ? 5 : Math.ceil(rawStep);
+                    minVal = Math.floor(minVal / step) * step;
+                    maxVal = Math.ceil(maxVal / step) * step;
+                    // Ensure zero is always visible
+                    if (minVal > 0) minVal = 0;
+                    if (maxVal < 0) maxVal = 0;
+
+                    // Background
+                    context.fillStyle = 'rgba(17,24,39,0.5)';
+                    context.fillRect(pad.left, pad.top, plotW, plotH);
+
+                    // ── Grid lines ──
+                    const numGrid = Math.round((maxVal - minVal) / step);
+                    context.strokeStyle = 'rgba(42,49,80,0.5)';
+                    context.lineWidth = 0.5;
+                    context.font = '9px JetBrains Mono';
+                    context.textAlign = 'right';
+                    for (let i = 0; i <= numGrid; i++) {
+                        const val = maxVal - i * step;
+                        const y = pad.top + plotH * (i / numGrid);
+                        context.beginPath(); context.moveTo(pad.left, y); context.lineTo(pad.left + plotW, y); context.stroke();
+                        context.fillStyle = 'rgba(158,167,192,0.6)';
+                        context.fillText(val.toFixed(step < 1 ? 1 : 0), pad.left - 4, y + 3);
+                    }
+
+                    // ── Zero line (bold) ──
+                    if (minVal < 0 && maxVal > 0) {
+                        const zeroY = pad.top + plotH * (maxVal / (maxVal - minVal));
+                        context.strokeStyle = 'rgba(255,255,255,0.25)';
+                        context.lineWidth = 1;
+                        context.setLineDash([3, 3]);
+                        context.beginPath(); context.moveTo(pad.left, zeroY); context.lineTo(pad.left + plotW, zeroY); context.stroke();
+                        context.setLineDash([]);
+                    }
+
+                    // ── Y-axis unit label ──
+                    context.save();
+                    context.fillStyle = 'rgba(158,167,192,0.5)';
+                    context.font = '8px JetBrains Mono';
+                    context.textAlign = 'center';
+                    context.translate(8, pad.top + plotH / 2);
+                    context.rotate(-Math.PI / 2);
+                    context.fillText('N·m', 0, 0);
+                    context.restore();
+
+                    // ── Data lines ──
+                    datasets.forEach((data, idx) => {
+                        if (data.length < 2) return;
+                        context.strokeStyle = colors[idx];
+                        context.lineWidth = 1.8;
+                        context.globalAlpha = 0.85;
+                        context.beginPath();
+                        data.forEach((val, i) => {
+                            const x = pad.left + (i / HISTORY_LEN) * plotW;
+                            const y = pad.top + plotH * ((maxVal - val) / (maxVal - minVal));
+                            const clampedY = Math.max(pad.top, Math.min(pad.top + plotH, y));
+                            if (i === 0) context.moveTo(x, clampedY);
+                            else context.lineTo(x, clampedY);
+                        });
+                        context.stroke();
+                        context.globalAlpha = 1;
+                    });
+
+                    // ── Inline legend ──
+                    let lx = pad.left + 6;
+                    const ly = pad.top + 10;
+                    context.font = '8px JetBrains Mono';
+                    labels.forEach((label, idx) => {
+                        context.fillStyle = colors[idx];
+                        context.fillRect(lx, ly - 6, 8, 4);
+                        context.textAlign = 'left';
+                        context.fillText(label, lx + 12, ly);
+                        lx += context.measureText(label).width + 20;
+                    });
+
+                    // ── Current values (right side) ──
+                    const valX = pad.left + plotW - 6;
+                    const valY = pad.top + 12;
+                    context.font = '9px JetBrains Mono';
+                    context.textAlign = 'right';
+                    datasets.forEach((data, idx) => {
+                        if (data.length > 0) {
+                            const cur = data[data.length - 1];
+                            context.fillStyle = colors[idx];
+                            context.fillText(cur.toFixed(2), valX, valY + idx * 11);
+                        }
+                    });
+
+                    context.restore();
+                }
+
+                // Dedicated tracking chart with dual Y-axis (left: °/N·m, right: RPM)
+                function drawTrackingChart(context, canvasEl, datasets, colors, minLeft, maxLeft, minRight, maxRight) {
+                    const w = canvasEl.width / devicePixelRatio;
+                    const h = canvasEl.height / devicePixelRatio;
+                    context.clearRect(0, 0, w * devicePixelRatio, h * devicePixelRatio);
+                    context.save();
+
+                    const pad = { top: 10, bottom: 16, left: 36, right: 42 };
+                    const plotW = w - pad.left - pad.right;
+                    const plotH = h - pad.top - pad.bottom;
+
+                    // Background
+                    context.fillStyle = 'rgba(17,24,39,0.5)';
+                    context.fillRect(pad.left, pad.top, plotW, plotH);
+
+                    // ── Left Y-axis grid & labels (°/N·m) ──
+                    context.strokeStyle = 'rgba(42,49,80,0.5)';
+                    context.lineWidth = 0.5;
+                    const numGridH = 4;
+                    for (let i = 0; i <= numGridH; i++) {
+                        const y = pad.top + (plotH / numGridH) * i;
+                        context.beginPath(); context.moveTo(pad.left, y); context.lineTo(pad.left + plotW, y); context.stroke();
+                        const val = maxLeft - (maxLeft - minLeft) * (i / numGridH);
+                        context.fillStyle = 'rgba(158,167,192,0.6)';
+                        context.font = '9px JetBrains Mono';
+                        context.textAlign = 'right';
+                        context.fillText(val.toFixed(0), pad.left - 4, y + 3);
+                    }
+
+                    // Left axis unit label
+                    context.save();
+                    context.fillStyle = 'rgba(158,167,192,0.5)';
+                    context.font = '8px JetBrains Mono';
+                    context.textAlign = 'center';
+                    context.translate(8, pad.top + plotH / 2);
+                    context.rotate(-Math.PI / 2);
+                    context.fillText('° / N·m', 0, 0);
+                    context.restore();
+
+                    // ── Right Y-axis labels (RPM) ──
+                    context.font = '9px JetBrains Mono';
+                    context.textAlign = 'left';
+                    for (let i = 0; i <= numGridH; i++) {
+                        const y = pad.top + (plotH / numGridH) * i;
+                        const val = maxRight - (maxRight - minRight) * (i / numGridH);
+                        context.fillStyle = 'rgba(255,152,0,0.5)';
+                        context.fillText(val.toFixed(0), pad.left + plotW + 4, y + 3);
+                    }
+
+                    // Right axis unit label
+                    context.save();
+                    context.fillStyle = 'rgba(255,152,0,0.5)';
+                    context.font = '8px JetBrains Mono';
+                    context.textAlign = 'center';
+                    context.translate(w - 4, pad.top + plotH / 2);
+                    context.rotate(Math.PI / 2);
+                    context.fillText('RPM', 0, 0);
+                    context.restore();
+
+                    // ── Zero line ──
+                    const zeroY = pad.top + plotH * (maxLeft / (maxLeft - minLeft));
+                    if (zeroY > pad.top && zeroY < pad.top + plotH) {
+                        context.strokeStyle = 'rgba(255,255,255,0.15)';
+                        context.lineWidth = 1;
+                        context.setLineDash([3, 3]);
+                        context.beginPath(); context.moveTo(pad.left, zeroY); context.lineTo(pad.left + plotW, zeroY); context.stroke();
+                        context.setLineDash([]);
+                    }
+
+                    // ── Data lines ──
+                    // datasets: [ref, meas, err, velRPM, cmd]
+                    // velRPM (index 3) uses right axis, all others use left axis
+                    datasets.forEach((data, idx) => {
+                        if (data.length < 2) return;
+                        const useRightAxis = (idx === 3);
+                        const mn = useRightAxis ? minRight : minLeft;
+                        const mx = useRightAxis ? maxRight : maxLeft;
+
+                        context.strokeStyle = colors[idx];
+                        context.lineWidth = (idx === 0 || idx === 1) ? 1.8 : 1.2;
+                        context.globalAlpha = (idx === 0) ? 0.5 : 0.85;
+                        if (idx === 3) {
+                            context.setLineDash([4, 3]);
+                            context.lineWidth = 1.5;
+                        }
+                        context.beginPath();
+                        data.forEach((val, i) => {
+                            const x = pad.left + (i / HISTORY_LEN) * plotW;
+                            const y = pad.top + plotH * ((mx - val) / (mx - mn));
+                            const clampedY = Math.max(pad.top, Math.min(pad.top + plotH, y));
+                            if (i === 0) context.moveTo(x, clampedY);
+                            else context.lineTo(x, clampedY);
+                        });
+                        context.stroke();
+                        context.globalAlpha = 1;
+                        context.setLineDash([]);
+                    });
+
+                    // ── Inline legend (top-left) ──
+                    const labels = ['Cons(°)', 'Mes(°)', 'Err(°)', 'Vit(RPM)', 'Cmd(N·m)'];
+                    let lx = pad.left + 6;
+                    const ly = pad.top + 10;
+                    context.font = '8px JetBrains Mono';
+                    labels.forEach((label, idx) => {
+                        context.fillStyle = colors[idx];
+                        context.globalAlpha = (idx === 0) ? 0.5 : 0.85;
+                        if (idx === 3) {
+                            // Dashed preview for velocity
+                            context.strokeStyle = colors[idx];
+                            context.lineWidth = 1.2;
+                            context.setLineDash([3, 2]);
+                            context.beginPath();
+                            context.moveTo(lx, ly - 3);
+                            context.lineTo(lx + 10, ly - 3);
+                            context.stroke();
+                            context.setLineDash([]);
+                        } else {
+                            context.fillRect(lx, ly - 6, 8, 4);
+                        }
+                        context.globalAlpha = 0.85;
+                        context.textAlign = 'left';
+                        context.fillText(label, lx + 12, ly);
+                        lx += context.measureText(label).width + 18;
+                    });
+                    context.globalAlpha = 1;
+
+                    context.restore();
+                }
 
                 function drawCyclogram(context, canvasEl, histX, histY) {
                     const w = canvasEl.width / devicePixelRatio;
@@ -2951,12 +3199,12 @@
                             csv += `${i},${history.hip[i].toFixed(2)},${history.knee[i].toFixed(2)}\n`;
                         }
                     } else if (activeModalGraph === 'chartTrackingHip') {
-                        csv = "TimeTick,Cons_Hip_deg,Mes_Hip_deg,Err_Hip_deg,Vel_Hip_rads,Cmd_Hip_Nm\n";
+                        csv = "TimeTick,Cons_Hip_deg,Mes_Hip_deg,Err_Hip_deg,Vel_Hip_RPM,Cmd_Hip_Nm\n";
                         for (let i = 0; i < history.pidRefHip.length; i++) {
                             csv += `${i},${history.pidRefHip[i].toFixed(2)},${history.pidMeasHip[i].toFixed(2)},${history.pidErrHip[i].toFixed(2)},${history.pidVelHip[i].toFixed(2)},${history.pidCmdHip[i].toFixed(2)}\n`;
                         }
                     } else if (activeModalGraph === 'chartTrackingKnee') {
-                        csv = "TimeTick,Cons_Knee_deg,Mes_Knee_deg,Err_Knee_deg,Vel_Knee_rads,Cmd_Knee_Nm\n";
+                        csv = "TimeTick,Cons_Knee_deg,Mes_Knee_deg,Err_Knee_deg,Vel_Knee_RPM,Cmd_Knee_Nm\n";
                         for (let i = 0; i < history.pidRefKnee.length; i++) {
                             csv += `${i},${history.pidRefKnee[i].toFixed(2)},${history.pidMeasKnee[i].toFixed(2)},${history.pidErrKnee[i].toFixed(2)},${history.pidVelKnee[i].toFixed(2)},${history.pidCmdKnee[i].toFixed(2)}\n`;
                         }
@@ -2998,37 +3246,93 @@
                 liberté : la cuisse (segment 1), le tibia (segment 2) et le pied (segment 3). Chaque segment possède une
                 masse \(m_i\), une longueur \(L_i\), et un centre de masse situé à \(l_{ci}\) de l'articulation
                 proximale.</p>
-            <h3>Paramètres Anthropométriques (Enfant 4-6 ans)</h3>
+
+            <h3>1.1 Répartition de la Masse Corporelle</h3>
+            <p>La masse de chaque segment est exprimée comme une <strong>fraction de la masse corporelle totale</strong>
+                \(M_{total}\), selon les tables anthropométriques de <em>Winter (1990)</em> et <em>De Leva (1996)</em>,
+                adaptées à une population pédiatrique (enfant 4-6 ans) :</p>
+
+            <div class="eq-block">
+                \[ m_i = \alpha_i \cdot M_{total} \]
+            </div>
+
             <table>
                 <thead>
                     <tr>
                         <th>Segment</th>
+                        <th>Coefficient \(\alpha_i\)</th>
+                        <th>Masse (18 kg)</th>
                         <th>Longueur</th>
-                        <th>Masse</th>
-                        <th>Centre de Masse</th>
+                        <th>Centre de masse</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr>
-                        <td>Cuisse (1)</td>
+                        <td><strong>Cuisse</strong> (1)</td>
+                        <td>\(\alpha_1 = 0.100\) &nbsp;(10%)</td>
+                        <td>1.80 kg</td>
                         <td>\(L_1 = 0.22 \, m\)</td>
-                        <td>\(m_1 = 0.10 \cdot M_{total}\)</td>
                         <td>\(l_{c1} = 0.5 \cdot L_1\)</td>
                     </tr>
                     <tr>
-                        <td>Tibia (2)</td>
+                        <td><strong>Tibia</strong> (2)</td>
+                        <td>\(\alpha_2 = 0.050\) &nbsp;(5%)</td>
+                        <td>0.90 kg</td>
                         <td>\(L_2 = 0.22 \, m\)</td>
-                        <td>\(m_2 = 0.06 \cdot M_{total}\)</td>
                         <td>\(l_{c2} = 0.5 \cdot L_2\)</td>
                     </tr>
                     <tr>
-                        <td>Pied (3)</td>
+                        <td><strong>Pied</strong> (3)</td>
+                        <td>\(\alpha_3 = 0.015\) &nbsp;(1.5%)</td>
+                        <td>0.27 kg</td>
                         <td>\(L_3 = 0.15 \, m\)</td>
-                        <td>\(m_3 = 0.02 \cdot M_{total}\)</td>
                         <td>\(l_{c3} = 0.5 \cdot L_3\)</td>
                     </tr>
                 </tbody>
             </table>
+
+            <p style="margin-top:12px;"><strong>Masse totale modélisée par jambe :</strong></p>
+            <div class="eq-block">
+                \[ m_{jambe} = (0.100 + 0.050 + 0.015) \cdot M_{total} = 0.165 \cdot M_{total} \]
+            </div>
+            <p>Pour un enfant de 18 kg : \(m_{jambe} = 2.97 \, kg\), soit <strong>16.5%</strong> de la masse corporelle
+                par jambe. Cette valeur est cohérente avec la littérature (Winter rapporte ~16-17% pour un membre
+                inférieur complet).</p>
+
+            <h3>1.2 Le Segment HAT (Head-Arms-Trunk)</h3>
+            <p>Le <strong>haut du corps</strong> (tête, bras, tronc) représente environ <strong>67%</strong> de la masse
+                corporelle totale. Dans notre modèle à 3 segments, le HAT n'est <em>pas</em> modélisé comme un segment
+                dynamique indépendant. Son influence est prise en compte de manière implicite par :</p>
+            <ul style="margin-left: 20px; margin-bottom: 16px;">
+                <li>Les <strong>forces de réaction au sol</strong> (GRF) qui supportent l'intégralité du poids corporel
+                    \(M_{total} \cdot g\)</li>
+                <li>Les <strong>couples articulaires à la hanche</strong> qui stabilisent le tronc au-dessus du bassin
+                </li>
+                <li>La trajectoire de référence qui intègre déjà les effets du balancement du tronc sur la cinématique
+                    de la jambe</li>
+            </ul>
+
+            <h3>1.3 Ajout de la Masse de l'Exosquelette</h3>
+            <p>Lorsque l'exosquelette est actif, sa masse \(M_{exo}\) est répartie <strong>uniformément</strong> entre
+                les 3 segments de la jambe :</p>
+            <div class="eq-block">
+                \[ m_i^{total} = \alpha_i \cdot M_{total} + \frac{M_{exo}}{3} \]
+            </div>
+            <p>Par défaut, \(M_{exo} = 1.5 \, kg\) par jambe, ce qui ajoute \(0.5 \, kg\) par segment. Cette masse
+                supplémentaire est compensée par le mode de <strong>transparence</strong> de l'exosquelette
+                (compensation gravitaire, cf. section 4).</p>
+
+            <h3>1.4 Moments d'Inertie Segmentaires</h3>
+            <p>Chaque segment est modélisé comme une <strong>barre rigide uniforme</strong>. Le moment d'inertie autour
+                du centre de masse est :</p>
+            <div class="eq-block">
+                \[ I_i = \frac{m_i \cdot L_i^2}{12} \]
+            </div>
+            <p>Les termes d'inertie totaux dans la matrice \(M(\mathbf{q})\) utilisent ensuite le
+                <strong>théorème de Huygens-Steiner</strong> pour transporter ces inerties aux articulations (cf.
+                section
+                2).
+            </p>
 
             <h2>2. Équations du Mouvement (Euler-Lagrange)</h2>
             <p>La dynamique du système est décrite par l'équation matricielle fondamentale :</p>
