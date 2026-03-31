@@ -474,6 +474,13 @@
             padding: 14px 10px;
             text-align: center;
             transition: border-color 0.3s, transform 0.2s;
+            /* Fix layout jumping */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 70px;
+            box-sizing: border-box;
         }
 
         .torque-item:hover {
@@ -487,6 +494,7 @@
             text-transform: uppercase;
             letter-spacing: 0.5px;
             margin-bottom: 6px;
+            white-space: nowrap;
         }
 
         .torque-item .value {
@@ -494,6 +502,7 @@
             font-size: 18px;
             font-weight: 700;
             line-height: 1.1;
+            white-space: nowrap;
         }
 
         .torque-item .unit {
@@ -987,9 +996,9 @@
                         <div class="slider-group">
                             <div class="slider-label">
                                 <span>Vitesse de marche</span>
-                                <span class="slider-value" id="valSpeed">0.5x</span>
+                                <span class="slider-value" id="valSpeed" style="font-size:11px;">0.90 m/s (TD)</span>
                             </div>
-                            <input type="range" id="sliderSpeed" min="0.2" max="3" step="0.1" value="0.5">
+                            <input type="range" id="sliderSpeed" min="0.3" max="1.5" step="0.05" value="0.9">
                         </div>
                         <div class="slider-group">
                             <div class="slider-label">
@@ -1015,9 +1024,9 @@
                         <div class="slider-group">
                             <div class="slider-label">
                                 <span>Masse corporelle</span>
-                                <span class="slider-value" id="valMass">18 kg</span>
+                                <span class="slider-value" id="valMass">16.2 kg</span>
                             </div>
-                            <input type="range" id="sliderMass" min="12" max="28" step="0.5" value="18">
+                            <input type="range" id="sliderMass" min="12" max="25" step="0.2" value="16.2">
                         </div>
                         <div class="toggle-group">
                             <span class="toggle-label">🔒 Bloquer cheville à 90°</span>
@@ -1266,12 +1275,11 @@
 
                 // ── Parameters (in cm → convert to meters internally) ──
                 const params = {
-                    speed: 0.5,
-                    thighLen: 0.22,
+                    speed: 0.9,
+                    thighLen: 0.22, // in meters
                     shankLen: 0.22,
                     footLen: 0.15,
-                    mass: 18,
-                    ankleLocked: true,
+                    mass: 16.2,
                     isCrouchGait: false,
                     weaknessEnabled: false,
                     spasticityLevel: 0
@@ -1423,6 +1431,10 @@
                 ];
                 const LEG_PHASE_OFFSET = [0, 0.5]; // left at cyclePhase, right at +50%
 
+                // Pelvis vertical dynamics (1 DOF)
+                let pelvisY = 0.45;
+                let pelvisVy = 0;
+
                 // Backward compat alias
                 const dynState = legs[0];
 
@@ -1451,6 +1463,8 @@
                 }
 
                 function initDynState() {
+                    pelvisY = 0.45;
+                    pelvisVy = 0;
                     for (let i = 0; i < 2; i++) {
                         const phase = (cyclePhase + LEG_PHASE_OFFSET[i]) % 1;
                         const h = hipAngle(phase), k = kneeAngle(phase), a = ankleAngle(phase);
@@ -1786,8 +1800,10 @@
 
                     const treadmill_v = -0.5 * params.speed;
 
-                    const N = 5;
+                    const N = 7;
                     const C_bulge = 0.03; // Semi-parabolic rocker sole depth
+                    const heelLen = L3 * 0.30; // heel extends behind ankle
+                    const totalSoleLen = heelLen + L3;
 
                     let totalFx = 0, totalFy = 0;
                     let sumNyX = 0, sumNyY = 0;
@@ -1795,8 +1811,10 @@
 
                     for (let i = 0; i < N; i++) {
                         const u = i / (N - 1);
-                        const X_loc = u * L3;
-                        const Y_loc = C_bulge * 4 * u * (1 - u);
+                        const X_loc = -heelLen + u * totalSoleLen; // from heel (-) to toe (+)
+                        // Parabolic bulge across the full sole
+                        const uNorm = (X_loc + heelLen) / totalSoleLen;
+                        const Y_loc = C_bulge * 4 * uNorm * (1 - uNorm);
 
                         const x_i = xa + X_loc * Math.sin(q[2]) - Y_loc * Math.cos(q[2]);
                         const y_i = ya + X_loc * Math.cos(q[2]) + Y_loc * Math.sin(q[2]);
@@ -1806,8 +1824,6 @@
 
                         let Ny = 0, Fx = 0;
                         if (y_i > y_ground) {
-                            // The force is distributed, so we can divide K by N or leave it strong
-                            // Since we just check penetration relative to the deepest point, it's fine.
                             Ny = Math.max(0, (K / 2) * (y_i - y_ground) + B * vy_i);
                             const v_rel_x = vx_i - treadmill_v;
                             Fx = -Math.sign(v_rel_x) * Math.min(Math.abs(B_friction * v_rel_x), mu * Ny);
@@ -1843,16 +1859,21 @@
                 function getDynamicLowestY(legsArray) {
                     let maxY = -1000;
                     const L1 = params.thighLen, L2 = params.shankLen, L3 = params.footLen;
-                    const N = 5;
+                    const heelLen = L3 * 0.30;
+                    const N = 7; // more points to cover heel + forefoot
                     const C_bulge = 0.03;
 
                     for (let i = 0; i < 2; i++) {
                         const q = legsArray[i].q;
                         const ya = L1 * Math.cos(q[0]) + L2 * Math.cos(q[1]);
+                        // Sample from -heelLen to +L3 (full foot length including heel)
+                        const totalLen = heelLen + L3;
                         for (let j = 0; j < N; j++) {
                             const u = j / (N - 1);
-                            const X_loc = u * L3;
-                            const Y_loc = C_bulge * 4 * u * (1 - u);
+                            const X_loc = -heelLen + u * totalLen; // from heel (-) to toe (+)
+                            // Parabolic bulge across the full sole, mapped to [0,1]
+                            const uNorm = (X_loc + heelLen) / totalLen;
+                            const Y_loc = C_bulge * 4 * uNorm * (1 - uNorm);
                             const y_i = ya + X_loc * Math.cos(q[2]) + Y_loc * Math.sin(q[2]);
                             maxY = Math.max(maxY, y_i);
                         }
@@ -1860,15 +1881,18 @@
                     return Math.max(0, maxY);
                 }
 
-                // Bipedal physics step: simulate both legs
+                // Bipedal physics step: simulate both legs and pelvis
                 function physicsStep(dt) {
-                    const currentLowestY = getDynamicLowestY(legs);
+                    let totalFySum = 0;
 
                     for (let i = 0; i < 2; i++) {
                         const phase = (cyclePhase + LEG_PHASE_OFFSET[i]) % 1;
 
                         // GRF must be computed first so it can be fed-forward to the controllers
-                        const tauGRF = computeDynamicGRF(legs[i], currentLowestY);
+                        // We use the dynamic pelvis height instead of lowest foot
+                        const tauGRF = computeDynamicGRF(legs[i], pelvisY);
+                        totalFySum += legs[i].grf.fy;
+
                         const tauSets = computeTorquesForLeg(phase, legs[i], tauGRF);
 
                         const totalCombined = [
@@ -1890,6 +1914,19 @@
                         }
                         clampJointsForLeg(legs[i]);
                     }
+
+                    // Update independent Pelvis Height (1 DOF)
+                    const totalMass = params.mass + (exoActive ? exoParams.mass * 2 : 0);
+                    const accelY = (totalFySum / totalMass) - 9.81;
+                    pelvisVy += accelY * dt;
+                    pelvisVy *= 0.98; // damping
+                    pelvisY += pelvisVy * dt;
+
+                    if (pelvisY < 0.15) {
+                        pelvisY = 0.15; // Hit the floor (prevents falling into negative space)
+                        pelvisVy = 0;
+                    }
+
                     lastJointTorques = legs[0].tau;
                 }
 
@@ -1990,7 +2027,14 @@
                         y: anklePos.y + params.footLen * scale * Math.cos(footAbsAngle),
                     };
 
-                    return { hipPos, kneePos, anklePos, toePos };
+                    // Heel: extends backward from ankle (opposite of toe direction)
+                    const heelLen = params.footLen * 0.30; // heel is ~30% of foot length
+                    const heelPos = {
+                        x: anklePos.x - heelLen * scale * Math.sin(footAbsAngle),
+                        y: anklePos.y - heelLen * scale * Math.cos(footAbsAngle),
+                    };
+
+                    return { hipPos, kneePos, anklePos, toePos, heelPos };
                 }
 
                 // ────────────────────────────────────────────
@@ -2044,7 +2088,7 @@
                     ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
                 }
 
-                function drawParabolicFoot(ap, tp, color, lineWidth) {
+                function drawParabolicFoot(ap, tp, color, lineWidth, hp_heel) {
                     const bulgeDepth = 0.03 * 500; // 3cm scale
                     ctx.save();
                     ctx.shadowColor = color;
@@ -2052,22 +2096,79 @@
                     ctx.strokeStyle = color;
                     ctx.lineWidth = lineWidth;
                     ctx.lineCap = 'round';
-                    ctx.beginPath();
-                    ctx.moveTo(ap.x, ap.y);
+                    ctx.lineJoin = 'round';
 
-                    const midX = (ap.x + tp.x) / 2;
-                    const midY = (ap.y + tp.y) / 2;
-                    const dx = tp.x - ap.x;
-                    const dy = tp.y - ap.y;
-                    const len = Math.sqrt(dx * dx + dy * dy) || 1;
-                    const nx = -dy / len;
-                    const ny = dx / len;
+                    if (hp_heel) {
+                        // Full foot: heel → ankle (parabolic sole) → toe
+                        // Compute the full sole from heel to toe
+                        const fullDx = tp.x - hp_heel.x;
+                        const fullDy = tp.y - hp_heel.y;
+                        const fullLen = Math.sqrt(fullDx * fullDx + fullDy * fullDy) || 1;
+                        const nx = -fullDy / fullLen;
+                        const ny = fullDx / fullLen;
 
-                    const cpX = midX + nx * (2 * bulgeDepth);
-                    const cpY = midY + ny * (2 * bulgeDepth);
+                        // Sole midpoint and control point for parabolic curve
+                        const soleMidX = (hp_heel.x + tp.x) / 2;
+                        const soleMidY = (hp_heel.y + tp.y) / 2;
+                        const cpX = soleMidX + nx * (2 * bulgeDepth);
+                        const cpY = soleMidY + ny * (2 * bulgeDepth);
 
-                    ctx.quadraticCurveTo(cpX, cpY, tp.x, tp.y);
-                    ctx.stroke();
+                        // Draw top of foot: heel → ankle → toe
+                        // Glow pass
+                        ctx.save();
+                        ctx.globalAlpha = 0.3;
+                        ctx.shadowBlur = 12;
+                        ctx.lineWidth = lineWidth + 3;
+                        ctx.beginPath();
+                        ctx.moveTo(hp_heel.x, hp_heel.y);
+                        ctx.lineTo(ap.x, ap.y);
+                        ctx.lineTo(tp.x, tp.y);
+                        ctx.stroke();
+                        ctx.restore();
+
+                        // Main top of foot
+                        ctx.beginPath();
+                        ctx.moveTo(hp_heel.x, hp_heel.y);
+                        ctx.lineTo(ap.x, ap.y);
+                        ctx.lineTo(tp.x, tp.y);
+                        ctx.stroke();
+
+                        // Parabolic sole (heel → toe)
+                        // Glow pass
+                        ctx.save();
+                        ctx.globalAlpha = 0.3;
+                        ctx.shadowBlur = 12;
+                        ctx.lineWidth = lineWidth + 2;
+                        ctx.beginPath();
+                        ctx.moveTo(hp_heel.x, hp_heel.y);
+                        ctx.quadraticCurveTo(cpX, cpY, tp.x, tp.y);
+                        ctx.stroke();
+                        ctx.restore();
+
+                        // Main sole
+                        ctx.beginPath();
+                        ctx.moveTo(hp_heel.x, hp_heel.y);
+                        ctx.quadraticCurveTo(cpX, cpY, tp.x, tp.y);
+                        ctx.stroke();
+                    } else {
+                        // Fallback: simple parabolic curve ankle→toe (for ghost legs etc.)
+                        ctx.beginPath();
+                        ctx.moveTo(ap.x, ap.y);
+
+                        const midX = (ap.x + tp.x) / 2;
+                        const midY = (ap.y + tp.y) / 2;
+                        const dx = tp.x - ap.x;
+                        const dy = tp.y - ap.y;
+                        const len = Math.sqrt(dx * dx + dy * dy) || 1;
+                        const nx = -dy / len;
+                        const ny = dx / len;
+
+                        const cpX = midX + nx * (2 * bulgeDepth);
+                        const cpY = midY + ny * (2 * bulgeDepth);
+
+                        ctx.quadraticCurveTo(cpX, cpY, tp.x, tp.y);
+                        ctx.stroke();
+                    }
                     ctx.restore();
                 }
 
@@ -2212,13 +2313,18 @@
                     // Forward kinematics
                     const fk = forwardKinematics(hip, knee, ankle);
 
-                    // Dynamic floor: calculate lowest foot Y relative to hip
-                    // Use the exact physics engine collision hull (scaled to pixels) to prevent visual clipping
-                    const lowestY = getDynamicLowestY(legs) * 500;
+                    let currentPelvisY;
+                    if (simMode === 'dynamic') {
+                        currentPelvisY = pelvisY;
+                    } else {
+                        // Kinematic mode: force floor to follow lowest foot exactly
+                        currentPelvisY = getDynamicLowestY(legs);
+                    }
+                    const lowestY_pixels = currentPelvisY * 500;
 
                     // Floor is fixed at h * 0.85
                     const floorY = h * 0.85;
-                    const originY = floorY - lowestY;
+                    const originY = floorY - lowestY_pixels;
                     const originX = w * 0.4;
 
                     // Draw Floor
@@ -2256,6 +2362,7 @@
                     const kp = { x: originX + fk.kneePos.x, y: originY + fk.kneePos.y };
                     const ap = { x: originX + fk.anklePos.x, y: originY + fk.anklePos.y };
                     const tp = { x: originX + fk.toePos.x, y: originY + fk.toePos.y };
+                    const heelP = { x: originX + fk.heelPos.x, y: originY + fk.heelPos.y };
 
                     // Foot trail (store absolute canvas coords)
                     footTrail.push({ x: tp.x, y: tp.y });
@@ -2265,7 +2372,7 @@
                     // Draw segments
                     drawSegment(hp.x, hp.y, kp.x, kp.y, '#00e5ff', 8);   // Cuisse
                     drawSegment(kp.x, kp.y, ap.x, ap.y, '#e040fb', 7);   // Tibia
-                    drawParabolicFoot(ap, tp, '#00e676', 6);             // Pied parabolique
+                    drawParabolicFoot(ap, tp, '#00e676', 6, heelP);      // Pied avec talon
                     if (simMode === 'dynamic') drawExoskeleton(fk, originX, originY, 1.0);
 
                     // Draw angle arcs
@@ -2309,9 +2416,10 @@
                         ctx.moveTo(originX + rfk.kneePos.x, originY + rfk.kneePos.y);
                         ctx.lineTo(originX + rfk.anklePos.x, originY + rfk.anklePos.y);
                         ctx.stroke();
-                        // Foot
+                        // Foot (with heel)
                         ctx.beginPath();
-                        ctx.moveTo(originX + rfk.anklePos.x, originY + rfk.anklePos.y);
+                        ctx.moveTo(originX + rfk.heelPos.x, originY + rfk.heelPos.y);
+                        ctx.lineTo(originX + rfk.anklePos.x, originY + rfk.anklePos.y);
                         ctx.lineTo(originX + rfk.toePos.x, originY + rfk.toePos.y);
                         ctx.stroke();
                         ctx.setLineDash([]);
@@ -2363,12 +2471,13 @@
                         const kp2 = { x: originX + fk2.kneePos.x, y: originY + fk2.kneePos.y };
                         const ap2 = { x: originX + fk2.anklePos.x, y: originY + fk2.anklePos.y };
                         const tp2 = { x: originX + fk2.toePos.x, y: originY + fk2.toePos.y };
+                        const heelP2 = { x: originX + fk2.heelPos.x, y: originY + fk2.heelPos.y };
 
                         ctx.save();
                         ctx.globalAlpha = 0.7;
                         drawSegment(hp.x, hp.y, kp2.x, kp2.y, '#4dd0e1', 7);
                         drawSegment(kp2.x, kp2.y, ap2.x, ap2.y, '#ce93d8', 6);
-                        drawParabolicFoot(ap2, tp2, '#69f0ae', 5);
+                        drawParabolicFoot(ap2, tp2, '#69f0ae', 5, heelP2);
                         drawJoint(kp2.x, kp2.y, 7, '#4dd0e1');
                         drawJoint(ap2.x, ap2.y, 6, '#ce93d8');
                         ctx.restore();
@@ -2385,11 +2494,12 @@
                         // Kinematic mode: ghost contralateral leg
                         const cfk = forwardKinematics(hipAngle(cPhase), kneeAngle(cPhase), ankleAngle(cPhase));
                         const tp2 = { x: originX + cfk.toePos.x, y: originY + cfk.toePos.y };
+                        const heelP_c = { x: originX + cfk.heelPos.x, y: originY + cfk.heelPos.y };
                         ctx.save();
                         ctx.globalAlpha = 0.18;
                         drawSegment(hp.x, hp.y, originX + cfk.kneePos.x, originY + cfk.kneePos.y, '#5c6380', 6);
                         drawSegment(originX + cfk.kneePos.x, originY + cfk.kneePos.y, originX + cfk.anklePos.x, originY + cfk.anklePos.y, '#5c6380', 5);
-                        drawSegment(originX + cfk.anklePos.x, originY + cfk.anklePos.y, tp2.x, tp2.y, '#5c6380', 4);
+                        drawParabolicFoot({ x: originX + cfk.anklePos.x, y: originY + cfk.anklePos.y }, tp2, '#5c6380', 4, heelP_c);
                         ctx.restore();
 
                         // GRF arrow for leg[1]
@@ -3048,7 +3158,19 @@
                     });
                 }
 
-                bindSlider('sliderSpeed', 'speed', 'valSpeed', 'x', 1);
+                // Custom speed slider to show CP annotations
+                const sliderSpeed = document.getElementById('sliderSpeed');
+                const valSpeed = document.getElementById('valSpeed');
+                sliderSpeed.addEventListener('input', () => {
+                    const v = parseFloat(sliderSpeed.value);
+                    params.speed = v;
+                    let annot = "";
+                    if (v >= 0.85) annot = " (TD / CP I)";
+                    else if (v >= 0.60 && v < 0.85) annot = " (CP II)";
+                    else if (v < 0.60) annot = " (CP III)";
+                    valSpeed.textContent = `${v.toFixed(2)} m/s${annot}`;
+                });
+
                 bindSlider('sliderThigh', 'thighLen', 'valThigh', 'cm', 0.01);
                 bindSlider('sliderShank', 'shankLen', 'valShank', 'cm', 0.01);
                 bindSlider('sliderFoot', 'footLen', 'valFoot', 'cm', 0.01);
@@ -3371,7 +3493,50 @@
                 q_3) \]
             </div>
 
-            <h2>3. Contrôle du Patient : Computed Torque Control (CTC)</h2>
+            <h2>3. Profils Biomécaniques & Paralysie Cérébrale (4-5 ans)</h2>
+            <p>Les pics de couple articulaire de référence pour un enfant au développement typique (TD) sont pondérés
+                selon la masse corporelle et suivent une loi de puissance par rapport à la vitesse de marche \(v\) :</p>
+            <div class="eq-block">
+                \[ M_{hanche}(v) = M_{ref,hanche} \cdot \left(\frac{v}{v_{norm}}\right)^{1.3} \]
+                \[ M_{genou}(v) = M_{ref,genou} \cdot \left(\frac{v}{v_{norm}}\right)^{1.6} \]
+            </div>
+            <p>Pour un enfant de 4 ans (\(v_{norm} = 0.9 \, m/s\)), les pics normatifs de référence sont :</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Articulation</th>
+                        <th>Pic max (Nm/kg)</th>
+                        <th>RMS estimé (Nm/kg)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Hanche</td>
+                        <td>0.60</td>
+                        <td>0.23</td>
+                    </tr>
+                    <tr>
+                        <td>Genou</td>
+                        <td>0.40</td>
+                        <td>0.15</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Impact de la Paralysie Cérébrale (CP) sur la Vitesse</h3>
+            <p>Chez l'enfant normo-typique (TD), la vitesse moyenne est de 0.8 à 1.4 m/s (0.9 m/s à 4 ans). Les enfants
+                atteints de paralysie cérébrale présentent des capacités motrices (et donc des vitesses) réduites,
+                définies selon l'échelle GMFCS :</p>
+            <ul>
+                <li><strong>GMFCS I :</strong> Vitesse typique ~0.80 m/s (Capacité max ~1.1 m/s)</li>
+                <li><strong>GMFCS II :</strong> Vitesse typique ~0.65 m/s (Capacité max ~0.9 m/s)</li>
+                <li><strong>GMFCS III :</strong> Vitesse typique ~0.45 m/s (Capacité max ~0.7 m/s)</li>
+            </ul>
+            <p><em>Implication :</em> Face à ces vitesses réduites, les modèles cliniques d'assistance (exosquelette)
+                doivent calibrer leurs contraintes de couple dynamique sur ces seuils de basse vitesse afin d'éviter
+                toute surestimation des forces correctrices.</p>
+
+            <h2>4. Contrôle du Patient : Computed Torque Control (CTC)</h2>
             <p>Le patient <em>sain</em> compense parfaitement la gravité et l'inertie grâce à un contrôleur en couple
                 calculé :</p>
             <div class="eq-block">
@@ -3390,7 +3555,7 @@
                 \lambda_{spast} \cdot \dot{q}_i \quad (\text{si extension}) \]
             </div>
 
-            <h2>4. Contrôle de l'Exosquelette : PID Assist-As-Needed (AAN)</h2>
+            <h2>5. Contrôle de l'Exosquelette : PID Assist-As-Needed (AAN)</h2>
             <p>L'exosquelette utilise une architecture PID avec bande morte (deadband) pour n'assister que lorsque
                 l'erreur dépasse un seuil toléré :</p>
             <div class="eq-block">
@@ -3404,7 +3569,7 @@
                 \[ \boldsymbol{\tau}_{exo} = \boldsymbol{\tau}_{assist} + G_{exo}(\mathbf{q}) \]
             </div>
 
-            <h2>5. Modèle du Moteur CubeMars AK60-6</h2>
+            <h2>6. Modèle du Moteur CubeMars AK60-6</h2>
             <table>
                 <thead>
                     <tr>
@@ -3439,7 +3604,7 @@
             <p>Le couple de commande est ensuite écrêté : \(\tau_{cmd} = \text{clamp}(\tau_{PID}, \,
                 -T_{max}(\dot{\theta}), \, +T_{max}(\dot{\theta}))\)</p>
 
-            <h2>6. Forces de Réaction au Sol (GRF)</h2>
+            <h2>7. Forces de Réaction au Sol (GRF)</h2>
             <p>Le contact au sol est modélisé par un modèle <strong>ressort-amortisseur distribué</strong>
                 (Hunt-Crossley simplifié) :</p>
             <div class="eq-block">
@@ -3449,7 +3614,7 @@
             <p>La pénétration de référence est calculée pour que le sol supporte exactement 1.05× le poids corporel :
                 \(\delta_{ref} = \frac{m \cdot g \cdot 1.05}{K}\)</p>
 
-            <h2>7. Cinématique de Marche (Tables Spline)</h2>
+            <h2>8. Cinématique de Marche (Tables Spline)</h2>
             <p>Les trajectoires de référence sont des données cliniques pédiatriques (Winter, 1991) interpolées par
                 <strong>splines de Catmull-Rom cycliques</strong>. Le cycle de marche est normalisé à \(t \in [0, 1]\),
                 avec 21 points d'ancrage à intervalles de 5%.
@@ -3458,7 +3623,7 @@
                 \[ q_{ref}(t) = \text{CatmullRom}(\text{DATA}_{joint}, \; t) \]
             </div>
 
-            <h2>8. Intégration Numérique</h2>
+            <h2>9. Intégration Numérique</h2>
             <p>Le solveur utilise une intégration d'<strong>Euler semi-implicite</strong> avec sous-pas de \(dt = 0.005
                 \, s\) (8 étapes par frame à 60 FPS) :</p>
             <div class="eq-block">
